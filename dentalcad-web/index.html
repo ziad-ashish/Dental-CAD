@@ -1,0 +1,1919 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>DentalCAD — Professional Dental Design System</title>
+<meta name="description" content="DentalCAD — Professional dental CAD/CAM design system. Crown, bridge, veneer, implant design powered by advanced 3D technology."/>
+<meta name="theme-color" content="#111318"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="DentalCAD"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml"/>
+<link rel="apple-touch-icon" href="icons/icon.svg"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="css/style.css"/>
+</head>
+<body>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     SPLASH SCREEN
+═════════════════════════════════════════════════════════════ -->
+<div id="splash">
+  <div class="splash-box">
+    <div class="splash-brand">
+      <!-- Animated logo ring -->
+      <div class="splash-logo-wrap">
+        <div class="splash-logo-ring"></div>
+        <div class="splash-logo-inner">
+          <svg width="38" height="38" viewBox="0 0 38 38" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M19 4C13.5 4 9 8 9 13c0 3 1.2 5.5 3 7.2V30a2 2 0 004 0v-2h6v2a2 2 0 004 0V20.2c1.8-1.7 3-4.2 3-7.2 0-5-4.5-9-10-9z" fill="url(#tg1)" opacity="0.9"/>
+            <path d="M14 14c0-2.8 2.2-5 5-5s5 2.2 5 5" stroke="rgba(255,255,255,0.4)" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+            <defs>
+              <linearGradient id="tg1" x1="9" y1="4" x2="29" y2="34" gradientUnits="userSpaceOnUse">
+                <stop stop-color="#60a5fa"/>
+                <stop offset="1" stop-color="#8b5cf6"/>
+              </linearGradient>
+            </defs>
+          </svg>
+        </div>
+      </div>
+
+      <!-- Brand text -->
+      <div class="splash-info">
+        <h1>Dental<strong>CAD</strong></h1>
+        <p>Professional Dental Design System</p>
+        <div class="splash-ver" data-app-version="full">DentalCAD v3.0 · Web Edition · Three.js powered</div>
+      </div>
+    </div>
+
+    <!-- Loading bar -->
+    <div class="splash-bar-wrap">
+      <div class="splash-loading" id="splash-msg">Initializing modules…</div>
+      <div class="splash-bar"><div class="splash-bar-fill"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     APP SHELL
+═════════════════════════════════════════════════════════════ -->
+<div id="app">
+
+  <!-- ── Menu Bar ─────────────────────────────────────────── -->
+  <div id="menubar">
+
+    <!-- Brand Logo -->
+    <div class="menubar-logo" title="DentalCAD v3.0">
+      <div class="menubar-logo-icon">
+        <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
+          <path d="M7 1C4.2 1 2 3 2 5.5c0 1.5.6 2.8 1.5 3.7V11a1 1 0 002 0v-.5h3V11a1 1 0 002 0V9.2C11.4 8.3 12 7 12 5.5 12 3 9.8 1 7 1z" fill="white" opacity="0.95"/>
+        </svg>
+      </div>
+      DentalCAD
+    </div>
+
+    <div class="menu-item">File
+      <div class="menu-dropdown">
+        <div class="menu-entry" data-action="new-case">New Case <span class="shortcut">Ctrl+N</span></div>
+        <div class="menu-entry" data-action="open-case">Open Case… <span class="shortcut">Ctrl+O</span></div>
+        <div class="menu-entry" data-action="recent-files">Recent Files…</div>
+        <div class="menu-separator"></div>
+        <div class="menu-entry" data-action="save">Save <span class="shortcut">Ctrl+S</span></div>
+        <div class="menu-entry" data-action="save-as">Save As…</div>
+        <div class="menu-separator"></div>
+        <div class="menu-entry" data-action="import-scan">Import Scan… <span class="shortcut">Ctrl+I</span></div>
+        <div class="menu-entry" data-action="folder-watch">📡 Watch Scanner Folder…</div>
+        <div class="menu-entry" data-action="export">Export Design… <span class="shortcut">Ctrl+E</span></div>
+        <div class="menu-separator"></div>
+        <div class="menu-entry" data-action="exit">Exit</div>
+      </div>
+    </div>
+
+    <div class="menu-item">Edit
+      <div class="menu-dropdown">
+        <div class="menu-entry" data-action="undo">Undo <span class="shortcut">Ctrl+Z</span></div>
+        <div class="menu-entry" data-action="redo">Redo <span class="shortcut">Ctrl+Shift+Z</span></div>
+        <div class="menu-separator"></div>
+        <div class="menu-entry" data-action="mirror">Mirror</div>
+        <div class="menu-entry" data-action="reset-library">Reset to Library</div>
+      </div>
+    </div>
+
+    <div class="menu-item">View
+      <div class="menu-dropdown">
+        <div class="menu-entry" data-action="view-front">Front View <span class="shortcut">Num 1</span></div>
+        <div class="menu-entry" data-action="view-top">Top View <span class="shortcut">Num 7</span></div>
+        <div class="menu-entry" data-action="view-side">Side View <span class="shortcut">Num 3</span></div>
+        <div class="menu-separator"></div>
+        <div class="menu-entry" data-action="toggle-grid">Toggle Grid <span class="shortcut">G</span></div>
+        <div class="menu-entry" data-action="toggle-wire">Toggle Wireframe <span class="shortcut">W</span></div>
+        <div class="menu-separator"></div>
+        <div class="menu-entry" data-action="toggle-left">Left Panel</div>
+        <div class="menu-entry" data-action="toggle-right">Right Panel</div>
+      </div>
+    </div>
+
+    <div class="menu-item">Tools
+      <div class="menu-dropdown">
+        <div class="menu-entry" data-action="margin-line">Margin Line <span class="shortcut">M</span></div>
+        <div class="menu-entry" data-action="measure">Measure <span class="shortcut">D</span></div>
+        <div class="menu-entry" data-action="occlusion">Occlusion Check <span class="shortcut">O</span></div>
+        <div class="menu-entry" data-action="cut-view">Section Cut <span class="shortcut">X</span></div>
+      </div>
+    </div>
+
+    <div class="menu-item">Modules
+      <div class="menu-dropdown">
+        <div class="menu-entry" data-action="modules">Browse Modules… <span class="shortcut">Ctrl+M</span></div>
+        <div class="menu-separator"></div>
+        <div class="menu-entry" data-action="mod-crown">Crown &amp; Bridge</div>
+        <div class="menu-entry" data-action="mod-implant">Implant Module</div>
+        <div class="menu-entry" data-action="mod-denture">Full Denture</div>
+        <div class="menu-entry" data-action="mod-model">Model Creator</div>
+        <div class="menu-entry" data-action="mod-guide">Surgical Guide</div>
+      </div>
+    </div>
+
+    <div class="menu-item">Help
+      <div class="menu-dropdown">
+        <div class="menu-entry" data-action="shortcuts">Keyboard Shortcuts <span class="shortcut">F1</span></div>
+        <div class="menu-separator"></div>
+        <div class="menu-entry" data-action="about">About DentalCAD</div>
+      </div>
+    </div>
+
+  </div><!-- /menubar -->
+
+  <!-- ── Toolbar ───────────────────────────────────────────── -->
+  <div id="toolbar">
+    <span class="tb-label">View</span>
+    <button class="tb-btn tb-tool-btn" data-tip="Rotate view (LMB drag)">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0118.8-4.3M22 12.5a10 10 0 01-18.8 4.2"/></svg>
+      Rotate
+    </button>
+    <button class="tb-btn tb-tool-btn" data-tip="Pan view (RMB drag)">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/><polyline points="15 19 12 22 9 19"/><polyline points="19 9 22 12 19 15"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg>
+      Pan
+    </button>
+    <button class="tb-btn tb-tool-btn" data-tip="Zoom (scroll wheel)">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+      Zoom
+    </button>
+    <button class="tb-btn" onclick="Viewport.setView('free')" data-tip="Reset view">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      Reset
+    </button>
+    <div class="tb-sep"></div>
+
+    <span class="tb-label">Measure</span>
+    <button class="tb-btn tb-tool-btn" data-tip="Measure distance between 2 points">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="2" y1="12" x2="22" y2="12"/><polyline points="2 9 2 15"/><polyline points="22 9 22 15"/><line x1="8" y1="12" x2="8" y2="8"/><line x1="16" y1="12" x2="16" y2="8"/></svg>
+      Distance
+    </button>
+    <button class="tb-btn tb-tool-btn" data-tip="Measure angle between 3 points">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 20h20M5 20L12 4l7 16"/><path d="M9 14h6"/></svg>
+      Angle
+    </button>
+    <div class="tb-sep"></div>
+
+    <button class="tb-btn tb-tool-btn" data-tip="Cross-section cut view (X)">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h7l3 3 3-3h5M3 12h18M3 17h7l3 3 3-3h5"/></svg>
+      Cut View
+    </button>
+    <div class="tb-sep"></div>
+
+    <button id="tb-undo" class="tb-btn" data-tip="Undo (Ctrl+Z)" disabled title="Nothing to undo">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 00-4-4H4"/></svg>
+      Undo
+    </button>
+    <button id="tb-redo" class="tb-btn" data-tip="Redo (Ctrl+Y)" disabled title="Nothing to redo">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 14 20 9 15 4"/><path d="M4 20v-7a4 4 0 014-4h12"/></svg>
+      Redo
+    </button>
+    <div class="tb-sep"></div>
+
+    <button id="tb-heatmap" class="tb-btn" data-tip="Wall Thickness Heatmap">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 14.76V3.5a2.5 2.5 0 00-5 0v11.26a4.5 4.5 0 105 0z"/></svg>
+      Thickness
+    </button>
+    <button id="tb-occlusion" class="tb-btn" data-tip="Occlusion Heatmap">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+      Occlusion
+    </button>
+    <button id="tb-nesting" class="tb-btn" data-tip="Nesting Preview — arrange on milling blank">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><rect x="6" y="7" width="5" height="6" rx="1"/><rect x="13" y="7" width="5" height="6" rx="1"/></svg>
+      Nesting
+    </button>
+    <div class="tb-sep"></div>
+
+    <button id="mode-btn" class="tb-btn" data-tip="Toggle Expert/Wizard mode (Space)">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
+      Expert Mode
+    </button>
+    <div class="tb-sep"></div>
+
+    <button id="tb-modules-btn" class="tb-btn" data-tip="Open Modules Browser (Ctrl+M)">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+      Modules
+    </button>
+  </div>
+
+  <!-- ── Case Info Bar ─────────────────────────────────────── -->
+  <div id="case-info-bar">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--text-dim);flex-shrink:0"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+    <span id="ci-patient" style="margin-left:5px">Patient: —</span>
+    <span style="color:var(--border);padding:0 4px">│</span>
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--text-dim);flex-shrink:0"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+    <span id="ci-caseid" style="margin-left:5px">Case: —</span>
+    <span style="color:var(--border);padding:0 4px">│</span>
+    <span id="ci-date">—</span>
+    <span style="color:var(--border);padding:0 4px">│</span>
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--accent);flex-shrink:0"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+    <span id="ci-step" class="step-info" style="margin-left:5px">New Case</span>
+
+    <span id="unsaved-indicator" class="hidden" style="color:var(--yellow);font-size:11px;font-weight:600;padding:0 8px;cursor:default" title="Unsaved changes — Ctrl+S to save">
+      ● Unsaved
+    </span>
+    <span class="mode-badge">WIZARD</span>
+  </div>
+
+  <!-- ── Auto-save restore banner ──────────────────────────── -->
+  <div id="restore-banner" class="hidden" style="
+      background:#2a2000;border-bottom:1px solid #5a4a00;
+      display:flex;align-items:center;gap:10px;padding:6px 14px;
+      font-size:12px;color:var(--yellow);flex-shrink:0;">
+    <span>🔄</span>
+    <span id="restore-banner-text">Auto-save found</span>
+    <button id="restore-btn-yes" class="btn btn-sm" style="background:#094771;color:#fff;border-color:#007acc;margin-left:6px">
+      Restore
+    </button>
+    <button id="restore-btn-no" class="btn btn-sm">Discard</button>
+  </div>
+
+  <!-- ── Main Body ─────────────────────────────────────────── -->
+  <div id="main-body">
+
+    <!-- ── Left Dock ───────────────────────────────────────── -->
+    <div id="left-dock" class="dock">
+
+      <div class="dock-section-header">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right:6px"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        Case Tree
+      </div>
+      <div id="case-tree">
+        <div class="tree-item root tree-toggle expanded">📋 New Case</div>
+        <div class="tree-children" style="display:block">
+          <div id="ct-patient"    class="tree-item child">👤 Patient: —</div>
+          <div id="ct-date"       class="tree-item child">📅 Date: —</div>
+          <div id="ct-scanner"    class="tree-item child">📡 Scanner: —</div>
+          <div id="ct-jaw"        class="tree-item child">⬛ Jaw: —</div>
+          <div id="ct-restoration"class="tree-item child">🔨 Restoration: —</div>
+          <div class="tree-item child tree-toggle">🦷 Selected Teeth ▸</div>
+          <div class="tree-children" id="ct-teeth-list">
+            <div class="tree-item child" style="color:#444;padding-left:40px">(none selected)</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="dock-separator"></div>
+      <div class="dock-section-header" style="margin-top:0">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right:6px"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        Modules
+      </div>
+      <div id="modules-list">
+        <button class="module-btn active" data-module="Crown &amp; Bridge">
+          <span class="module-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9l3 11h14l3-11"/><path d="M2 9h20"/><path d="M7 9V5l5 4 5-4v4"/></svg></span>Crown &amp; Bridge
+        </button>
+        <button class="module-btn" data-module="Implant Module">
+          <span class="module-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="2" x2="12" y2="22"/><path d="M8 6h8M7 10h10M8 14h8M9 18h6"/></svg></span>Implant Module
+        </button>
+        <button class="module-btn" data-module="Bar Module">
+          <span class="module-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="9" width="20" height="6" rx="3"/><circle cx="7" cy="12" r="2"/><circle cx="17" cy="12" r="2"/></svg></span>Bar Module
+        </button>
+        <button class="module-btn" data-module="Model Creator">
+          <span class="module-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg></span>Model Creator
+        </button>
+        <button class="module-btn" data-module="Bite Splint">
+          <span class="module-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span>Bite Splint
+        </button>
+        <button class="module-btn" data-module="Full Denture">
+          <span class="module-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="4" height="8" rx="2"/><rect x="10" y="3" width="4" height="8" rx="2"/><rect x="17" y="3" width="4" height="8" rx="2"/><path d="M1 13q11 8 22 0"/></svg></span>Full Denture
+        </button>
+        <button class="module-btn" data-module="Smile Creator">
+          <span class="module-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg></span>Smile Creator
+        </button>
+        <button class="module-btn" data-module="Surgical Guide">
+          <span class="module-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg></span>Surgical Guide
+        </button>
+        <button class="module-btn" data-module="Wax-up">
+          <span class="module-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 2A2.5 2.5 0 0112 4.5v0A2.5 2.5 0 019.5 7h0v14"/><path d="M14.5 2A2.5 2.5 0 0112 4.5v0A2.5 2.5 0 0114.5 7h0v14"/></svg></span>Wax-up
+        </button>
+        <button class="module-btn" data-module="Orthodontic">
+          <span class="module-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h16M4 6h16M4 18h16"/></svg></span>Orthodontic
+        </button>
+      </div>
+
+    </div><!-- /left-dock -->
+    <div id="left-resize" class="resize-handle-v"></div>
+
+    <!-- ── Central Area ─────────────────────────────────────── -->
+    <div id="central">
+
+      <!-- 3D Viewport -->
+      <div id="viewport-container">
+        <canvas id="viewport-canvas"></canvas>
+
+        <div id="viewport-overlay">
+          <button class="vp-btn active" data-view="free">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+            Free
+          </button>
+          <button class="vp-btn" data-view="front">Front</button>
+          <button class="vp-btn" data-view="top">Top</button>
+          <button class="vp-btn" data-view="side">Side</button>
+          <button id="vp-wireframe" class="vp-btn">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
+            Wire
+          </button>
+          <button id="vp-grid" class="vp-btn">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="3" x2="3" y2="21"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/><line x1="21" y1="3" x2="21" y2="21"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/></svg>
+            Grid
+          </button>
+        </div>
+
+        <div id="viewport-hint">LMB Rotate · RMB Pan · Scroll Zoom</div>
+      </div>
+
+      <!-- Resize handle between viewport and wizard -->
+      <div id="wizard-resize" class="resize-handle-h"></div>
+
+      <!-- ── Wizard Panel ─────────────────────────────────── -->
+      <div id="wizard-panel">
+
+        <!-- Step Indicator -->
+        <div id="step-indicator"></div>
+
+        <!-- Step Content -->
+        <div id="wizard-content">
+
+          <!-- ═══ STEP 1: New Case ════════════════════════════ -->
+          <div class="wizard-step active" id="step-0">
+            <div class="step-title">New Case</div>
+            <div class="step-subtitle">Enter patient information to create a new dental case.</div>
+            <div class="form-card">
+              <div class="form-grid">
+                <label class="form-label">Patient Name:</label>
+                <input id="inp-patient" class="form-input" type="text" placeholder="e.g. Ahmed Al-Rashid" />
+
+                <label class="form-label">Case ID:</label>
+                <input id="inp-caseid" class="form-input" type="text" />
+
+                <label class="form-label">Date:</label>
+                <input id="inp-date" class="form-input" type="date" />
+
+                <label class="form-label">Clinician:</label>
+                <input id="inp-clinician" class="form-input" type="text" placeholder="Dr. …" />
+
+                <label class="form-label">Scanner:</label>
+                <select id="sel-scanner" class="form-select">
+                  <option>3Shape TRIOS 4</option>
+                  <option>3Shape TRIOS 5</option>
+                  <option>iTero Element 5D</option>
+                  <option>Medit i700</option>
+                  <option>Planmeca Emerald</option>
+                  <option>Cerec Primescan</option>
+                  <option>Carestream CS 3700</option>
+                  <option>STL File Import</option>
+                </select>
+
+                <label class="form-label">Laboratory:</label>
+                <input id="inp-lab" class="form-input" type="text" placeholder="Lab name / ID" />
+              </div>
+            </div>
+
+            <div class="form-label" style="margin-bottom:8px">Select Jaw:</div>
+            <div class="jaw-selector">
+              <button class="jaw-btn active" data-jaw="upper">⬆ Upper Jaw</button>
+              <button class="jaw-btn" data-jaw="lower">⬇ Lower Jaw</button>
+              <button class="jaw-btn" data-jaw="both">↕ Both Jaws</button>
+            </div>
+          </div>
+
+          <!-- ═══ STEP 2: Scan Import ═════════════════════════ -->
+          <div class="wizard-step" id="step-1">
+            <div class="step-title">Scan Import</div>
+            <div class="step-subtitle">Import a digital scan file or load the demo scan.</div>
+
+            <div id="drop-zone">
+              <div class="drop-icon">📂</div>
+              <div class="drop-title">Drop scan file here</div>
+              <div class="drop-sub">Supported: .stl &nbsp; .obj &nbsp; .ply &nbsp; .3oxz &nbsp; .dcm</div>
+            </div>
+            <input id="scan-file-input" type="file" accept=".stl,.obj,.ply,.3oxz,.dcm" style="display:none" />
+
+            <div class="flex-row mt-8">
+              <button id="btn-browse-scan" class="btn btn-primary">📁 Browse File…</button>
+              <button id="btn-demo-scan"   class="btn">▶ Load Demo Scan</button>
+              <button id="btn-folder-watch-scan" class="btn"
+                      style="background:rgba(6,182,212,0.08);border-color:rgba(6,182,212,0.3);color:var(--cyan)"
+                      title="Watch a local folder for new scanner files (Chrome/Edge only)">
+                📡 Watch Folder
+              </button>
+            </div>
+
+            <!-- Folder watch status line -->
+            <div id="fw-scan-status" style="margin-top:6px;font-size:11px;color:var(--text-dim);font-family:var(--font-mono);min-height:15px"></div>
+
+            <div id="scan-progress" class="progress-wrap mt-8 hidden">
+              <div id="scan-prog-fill" class="progress-fill"></div>
+            </div>
+            <div id="scan-status" class="mt-8" style="color:var(--accent-dim);font-size:12px;"></div>
+
+            <div id="scan-info-card" class="form-card mt-12 hidden">
+              <div class="section-hdr">Scan Information</div>
+              <div class="form-grid" style="grid-template-columns:100px 1fr;gap:6px 12px;">
+                <span class="text-dim">File:</span>       <span id="scan-fname"  style="font-size:12px;color:var(--text)"></span>
+                <span class="text-dim">Format:</span>     <span id="scan-format" style="font-size:12px;color:var(--text)"></span>
+                <span class="text-dim">Vertices:</span>   <span id="scan-verts"  style="font-size:12px;color:var(--text)"></span>
+                <span class="text-dim">Triangles:</span>  <span id="scan-tris"   style="font-size:12px;color:var(--text)"></span>
+                <span class="text-dim">Dimensions:</span> <span id="scan-dims"   style="font-size:12px;color:var(--text)"></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- ═══ STEP 3: Tooth Selection ═════════════════════ -->
+          <div class="wizard-step" id="step-2">
+            <div class="step-title">Tooth Selection</div>
+            <div class="step-subtitle">Click teeth to select them for restoration. Multi-select supported.</div>
+
+            <div class="flex-row mt-8" style="margin-bottom:14px">
+              <button id="btn-sel-upper" class="btn btn-sm">Select All Upper</button>
+              <button id="btn-sel-lower" class="btn btn-sm">Select All Lower</button>
+              <button id="btn-sel-clear" class="btn btn-sm">Clear Selection</button>
+            </div>
+
+            <div id="dental-chart-container"></div>
+
+            <div id="tooth-selection-summary" style="margin-top:10px;color:var(--accent-dim);font-size:13px;">
+              No teeth selected.
+            </div>
+          </div>
+
+          <!-- ═══ STEP 4: Restoration Type ════════════════════ -->
+          <div class="wizard-step" id="step-3">
+            <div class="step-title">Restoration Type</div>
+            <div class="step-subtitle">Select the type of restoration for the chosen teeth.</div>
+
+            <div class="rest-grid mt-8">
+              <div class="rest-card" data-rest="Crown" style="--rest-c:#007acc">
+                <div class="rest-icon">👑</div>
+                <div class="rest-name">Crown</div>
+                <div class="rest-desc">Full coverage restoration covering the entire tooth</div>
+              </div>
+              <div class="rest-card" data-rest="Bridge" style="--rest-c:#4ec9b0">
+                <div class="rest-icon">🌉</div>
+                <div class="rest-name">Bridge</div>
+                <div class="rest-desc">Fixed prosthesis spanning one or more missing teeth</div>
+              </div>
+              <div class="rest-card" data-rest="Veneer" style="--rest-c:#c586c0">
+                <div class="rest-icon">🪟</div>
+                <div class="rest-name">Veneer</div>
+                <div class="rest-desc">Thin porcelain shell bonded to tooth surface</div>
+              </div>
+              <div class="rest-card" data-rest="Inlay" style="--rest-c:#dcdcaa">
+                <div class="rest-icon">🔷</div>
+                <div class="rest-name">Inlay</div>
+                <div class="rest-desc">Conservative indirect restoration within cusps</div>
+              </div>
+              <div class="rest-card" data-rest="Onlay" style="--rest-c:#ce9178">
+                <div class="rest-icon">🔹</div>
+                <div class="rest-name">Onlay</div>
+                <div class="rest-desc">Extended inlay covering one or more cusps</div>
+              </div>
+              <div class="rest-card" data-rest="Full Denture" style="--rest-c:#f14c4c">
+                <div class="rest-icon">😁</div>
+                <div class="rest-name">Full Denture</div>
+                <div class="rest-desc">Complete removable prosthesis for edentulous arch</div>
+              </div>
+              <div class="rest-card" data-rest="Partial Denture" style="--rest-c:#e8c065">
+                <div class="rest-icon">🔲</div>
+                <div class="rest-name">Partial Denture</div>
+                <div class="rest-desc">Removable partial prosthesis for multiple missing teeth</div>
+              </div>
+              <div class="rest-card" data-rest="Implant Crown" style="--rest-c:#9cdcfe">
+                <div class="rest-icon">🔩</div>
+                <div class="rest-name">Implant Crown</div>
+                <div class="rest-desc">Crown supported by dental implant fixture</div>
+              </div>
+              <div class="rest-card" data-rest="Implant Bridge" style="--rest-c:#b5cea8">
+                <div class="rest-icon">⚙</div>
+                <div class="rest-name">Implant Bridge</div>
+                <div class="rest-desc">Multi-unit bridge on implant abutments</div>
+              </div>
+              <div class="rest-card" data-rest="Bite Splint" style="--rest-c:#86c5da">
+                <div class="rest-icon">🦷</div>
+                <div class="rest-name">Bite Splint</div>
+                <div class="rest-desc">Occlusal splint for bruxism / TMD treatment</div>
+              </div>
+              <div class="rest-card" data-rest="Surgical Guide" style="--rest-c:#80a0c0">
+                <div class="rest-icon">🔬</div>
+                <div class="rest-name">Surgical Guide</div>
+                <div class="rest-desc">Implant placement guide for precision surgery</div>
+              </div>
+              <div class="rest-card" data-rest="Model" style="--rest-c:#a0a0a0">
+                <div class="rest-icon">🗿</div>
+                <div class="rest-name">Model</div>
+                <div class="rest-desc">Diagnostic study model or gingival mask</div>
+              </div>
+            </div>
+
+            <div id="rest-selection-label" style="color:var(--accent-dim);font-size:13px;margin-top:4px;">
+              No restoration type selected.
+            </div>
+
+            <!-- Smart Suggestion hint — populated dynamically -->
+            <div id="restoration-hint-banner"
+                 style="margin-top:10px;padding:8px 12px;
+                        background:rgba(139,92,246,0.07);
+                        border:1px solid rgba(139,92,246,0.25);
+                        border-radius:6px;font-size:11px;
+                        color:var(--text-dim);line-height:1.6;
+                        display:none">
+              <div style="font-weight:600;color:#c4b5fd;margin-bottom:3px">
+                ✨ Smart Suggestion (rule-based)
+              </div>
+              <div id="hint-primary"></div>
+              <div id="hint-rationale" style="font-size:10px;color:var(--text-dim);margin-top:2px"></div>
+              <div id="hint-alternatives" style="font-size:10px;color:var(--text-dim);margin-top:2px"></div>
+              <div style="font-size:9.5px;color:var(--text-dim);margin-top:5px;
+                          padding-top:4px;border-top:1px solid rgba(139,92,246,0.15)">
+                ⚠ Indicative only — not clinical advice
+              </div>
+            </div>
+
+          <!-- ═══ STEP 5: Design Tools ════════════════════════ -->
+          <div class="wizard-step" id="step-4" style="padding:0;height:100%;">
+            <div id="design-step-inner">
+
+              <!-- Tool Sidebar -->
+              <div class="design-tool-sidebar">
+                <div style="font-size:9px;color:var(--text-dim);font-weight:700;letter-spacing:.8px;margin-bottom:6px;text-transform:uppercase">Tools</div>
+
+                <button class="design-tool-btn" data-tool="Margin Line" title="Margin Line (M)"
+                  data-desc="Draw the restoration margin line on the scan surface">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+                </button>
+
+                <button class="design-tool-btn" data-tool="Sculpt" title="Sculpt (free-form)"
+                  data-desc="Free-form sculpting of the restoration surface">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>
+                </button>
+
+                <button class="design-tool-btn" data-tool="Smooth" title="Smooth surface"
+                  data-desc="Smooth rough surface areas with a brush">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 12c0-4.97 4.03-9 9-9s9 4.03 9 9-4.03 9-9 9"/><path d="M8 12c0-2.21 1.79-4 4-4s4 1.79 4 4"/><path d="M12 16a4 4 0 000-8"/></svg>
+                </button>
+
+                <button class="design-tool-btn" data-tool="Add Material" title="Add material"
+                  data-desc="Add material to undercut or concave areas">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+                </button>
+
+                <button class="design-tool-btn" data-tool="Remove Material" title="Remove material"
+                  data-desc="Remove excess material from the surface">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+                </button>
+
+                <div style="width:30px;height:1px;background:var(--border);margin:3px 0"></div>
+
+                <button class="design-tool-btn" data-tool="Cut View" title="Section cut (X)"
+                  data-desc="Cross-section clipping plane">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="12" x2="20" y2="12"/><polyline points="4 6 4 20"/><polyline points="20 6 20 20"/><path d="M8 6h8v12H8z" fill="rgba(255,255,255,0.08)"/></svg>
+                </button>
+
+                <button class="design-tool-btn" data-tool="Measure" title="Measure (D)"
+                  data-desc="Measure distances and angles on the mesh">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="21" x2="21" y2="3"/><path d="M7 7l2 2M11 3l2 2M3 11l2 2M15 15l2 2"/></svg>
+                </button>
+
+                <button class="design-tool-btn" data-tool="Contact Points" title="Contact points"
+                  data-desc="Show and adjust proximal contact points">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="8" cy="12" r="3"/><circle cx="16" cy="12" r="3"/><line x1="11" y1="12" x2="13" y2="12"/></svg>
+                </button>
+
+                <button class="design-tool-btn" data-tool="Occlusion" title="Occlusion check"
+                  data-desc="Occlusion check and adjustment heatmap">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><ellipse cx="12" cy="8" rx="8" ry="4"/><path d="M4 8v8c0 2.21 3.58 4 8 4s8-1.79 8-4V8"/></svg>
+                </button>
+
+                <button class="design-tool-btn" data-tool="Connectors" title="Bridge connectors"
+                  data-desc="Adjust bridge connector dimensions">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2" y="8" width="6" height="8" rx="1"/><rect x="16" y="8" width="6" height="8" rx="1"/><path d="M8 12h8"/></svg>
+                </button>
+
+                <div style="width:30px;height:1px;background:var(--border);margin:3px 0"></div>
+
+                <button class="design-tool-btn" data-tool="Reset" title="Reset to library"
+                  data-desc="Reset mesh to original library shape">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>
+                </button>
+              </div>
+
+              <!-- Canvas area -->
+              <div class="design-canvas-area">
+                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" style="color:var(--text-dim);opacity:0.4">
+                  <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/>
+                  <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+                  <line x1="12" y1="22.08" x2="12" y2="12"/>
+                </svg>
+                <div id="active-tool-label" style="color:var(--text-dim);font-size:12px;font-weight:500">Active Tool: None</div>
+                <div style="font-size:12px;color:var(--text-faint);max-width:300px;line-height:1.7;text-align:center">
+                  The 3D model renders in the viewport above.<br>
+                  Select a tool from the sidebar to begin.
+                </div>
+                <div class="flex-row" style="gap:6px;margin-top:4px">
+                  <button class="btn btn-sm" onclick="document.getElementById('tb-undo').click()">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 00-4-4H4"/></svg>
+                    Undo
+                  </button>
+                  <button class="btn btn-sm" onclick="document.getElementById('tb-redo').click()">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 14 20 9 15 4"/><path d="M4 20v-7a4 4 0 014-4h12"/></svg>
+                    Redo
+                  </button>
+                </div>
+              </div>
+
+              <!-- Parameters panel -->
+              <div class="design-params">
+                <div class="section-hdr" id="param-tool-name">Select a Tool</div>
+                <div style="font-size:11px;color:#666;margin-bottom:12px" id="param-tool-desc">Choose a tool from the sidebar to see its parameters.</div>
+
+                <!-- ── Sculpt / Smooth params ── -->
+                <div class="param-label">Brush Radius</div>
+                <input id="sculpt-radius" type="range" class="range-slider" min="0.05" max="1.5" step="0.05" value="0.35" />
+
+                <div class="param-label">Strength</div>
+                <input id="sculpt-strength" type="range" class="range-slider" min="0.001" max="0.04" step="0.001" value="0.008" />
+
+                <div class="param-label">Smoothing</div>
+                <input type="range" class="range-slider" min="0" max="100" value="40" />
+
+                <div class="param-label" style="margin-top:6px">Brush Falloff</div>
+                <div style="display:flex;gap:3px;margin-bottom:6px">
+                  <button class="btn btn-sm falloff-btn" data-falloff="linear"
+                    style="flex:1;font-size:10px;padding:2px 0">Linear</button>
+                  <button class="btn btn-sm falloff-btn active" data-falloff="smooth"
+                    style="flex:1;font-size:10px;padding:2px 0">Smooth</button>
+                  <button class="btn btn-sm falloff-btn" data-falloff="constant"
+                    style="flex:1;font-size:10px;padding:2px 0">Flat</button>
+                </div>
+
+                <div style="margin:8px 0 4px;display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text)">
+                  <input id="sculpt-subtract" type="checkbox" />
+                  <label for="sculpt-subtract">Subtract (Alt+drag)</label>
+                </div>
+
+                <!-- ── Margin line controls ── -->
+                <div id="margin-line-ui" class="hidden" style="margin-top:2px">
+                  <div class="param-label" style="color:var(--accent-dim)">Margin Line</div>
+
+                  <!-- Point counter -->
+                  <div id="ml-point-count"
+                       style="font-size:11px;color:var(--green);margin:5px 0 8px;
+                              padding:4px 8px;background:var(--bg2);border-radius:4px;
+                              border:1px solid var(--border)">
+                    Points: 0  (open)
+                  </div>
+
+                  <!-- Instructions -->
+                  <div style="font-size:10px;color:#555;line-height:1.6;margin-bottom:8px">
+                    <b style="color:#666">Click</b> mesh to place point<br>
+                    <b style="color:#666">Click point</b> to select (red)<br>
+                    <b style="color:#666">Delete</b> removes selected point<br>
+                    <b style="color:#666">Double-click</b> toggles closed loop
+                  </div>
+
+                  <!-- Action buttons -->
+                  <div style="display:flex;flex-direction:column;gap:5px">
+                    <button id="btn-toggle-close" class="btn btn-sm" style="width:100%" disabled>
+                      ⭕ Close Line
+                    </button>
+                    <button id="btn-close-margin" class="btn btn-sm" style="width:100%;display:none">
+                      Close Line (legacy)
+                    </button>
+                    <button id="btn-export-margin-obj" class="btn btn-sm"
+                            style="width:100%;background:#0a2a1a;border-color:#00ffcc">
+                      📤 Export Margin (.OBJ)
+                    </button>
+                    <button id="btn-clear-margin" class="btn btn-sm btn-danger"
+                            style="width:100%">
+                      🗑 Clear All Points
+                    </button>
+                  </div>
+                </div>
+
+                <!-- ── Section Cut UI ── -->
+                <div id="section-cut-ui" class="hidden" style="margin-top:14px">
+                  <div class="param-label">Cut Axis</div>
+                  <div class="flex-row" style="gap:4px;margin-bottom:8px">
+                    <button class="btn btn-sm cut-axis-btn active" data-axis="y">Y</button>
+                    <button class="btn btn-sm cut-axis-btn" data-axis="x">X</button>
+                    <button class="btn btn-sm cut-axis-btn" data-axis="z">Z</button>
+                  </div>
+                  <div class="param-label">Offset</div>
+                  <input id="cut-offset-slider" type="range" class="range-slider" min="-1" max="1" step="0.01" value="0" />
+                  <div style="font-size:10px;color:#555;margin-top:2px;text-align:center">Drag to move cutting plane</div>
+                </div>
+
+                <!-- ── Measure UI ── -->
+                <div id="measure-ui" class="hidden" style="margin-top:14px">
+                  <div class="param-label">Measure Mode</div>
+                  <div class="flex-row" style="gap:4px;margin-bottom:8px">
+                    <button class="btn btn-sm measure-mode-btn active" data-mode="distance">Distance</button>
+                    <button class="btn btn-sm measure-mode-btn" data-mode="angle">Angle</button>
+                  </div>
+                  <div style="font-size:11px;color:#666;line-height:1.5">
+                    Click on the mesh surface to place measurement points.<br>
+                    <span style="color:var(--accent-dim)">Distance:</span> 2 clicks<br>
+                    <span style="color:var(--accent-dim)">Angle:</span> 3 clicks
+                  </div>
+                </div>
+
+                <div class="param-label" style="margin-top:16px">Material</div>
+                <select class="form-select" style="width:100%;height:28px;font-size:12px">
+                  <option>Zirconia (3Y-TZP)</option>
+                  <option>Zirconia (5Y-TZP)</option>
+                  <option>Lithium Disilicate</option>
+                  <option>PMMA (Temporary)</option>
+                  <option>Composite Resin</option>
+                  <option>Metal (CoCr)</option>
+                </select>
+
+                <!-- ── Wall Thickness Settings ── -->
+                <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:10px">
+                  <div class="param-label" style="color:var(--accent-dim)">🌡 Thickness Heatmap</div>
+                  <div class="param-label">Min (mm)</div>
+                  <input id="ht-min-thick" type="number" class="form-input"
+                    style="height:26px;font-size:11px" min="0.1" max="3" step="0.1" value="0.5"/>
+                  <div class="param-label">Max (mm)</div>
+                  <input id="ht-max-thick" type="number" class="form-input"
+                    style="height:26px;font-size:11px" min="0.5" max="10" step="0.5" value="3.0"/>
+                  <button id="btn-run-heatmap" class="btn btn-sm btn-primary"
+                    style="width:100%;margin-top:6px"
+                    onclick="document.getElementById('tb-heatmap').click()">
+                    Run Heatmap
+                  </button>
+                </div>
+
+                <!-- ── Auto Margin Detection ── -->
+                <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:10px">
+                  <div class="param-label" style="color:var(--accent-dim)">✏ Auto Margin Line</div>
+                  <div class="param-label">Sensitivity (%)</div>
+                  <input id="ml-auto-sensitivity" type="range" class="range-slider"
+                    min="5" max="40" step="1" value="15"/>
+                  <div style="font-size:10px;color:#666;text-align:center;margin-bottom:4px">
+                    Higher = more vertices considered
+                  </div>
+                  <button id="btn-auto-margin" class="btn btn-sm"
+                    style="width:100%;background:#1a3550;border-color:var(--accent)">
+                    🔍 Detect Automatically
+                  </button>
+                  <button id="btn-smart-margin" class="btn btn-sm"
+                    style="width:100%;background:rgba(139,92,246,0.1);
+                           border-color:rgba(139,92,246,0.35);color:#c4b5fd;margin-top:4px">
+                    ✨ Smart Suggestion
+                  </button>
+            <div style="font-size:9.5px;color:var(--text-dim);line-height:1.4;
+                              margin-top:3px;padding:0 2px">
+                    Enhanced curvature + edge analysis.<br>
+                    <b>Not AI</b> — rule-based math, review before use.
+                  </div>
+                  <!-- AUTO-SUGGEST disclaimer — shown after detection -->
+                  <div id="margin-auto-suggest-banner" class="hidden"
+                    style="margin-top:6px;padding:6px 8px;background:#1a0a00;
+                           border:1px solid #e8c065;border-radius:5px;
+                           font-size:10px;color:#e8c065;line-height:1.5">
+                    ⚠ <b>Auto-Suggest:</b> This is a computer-generated estimate.<br>
+                    Review &amp; adjust <b>every point</b> manually with the Margin<br>
+                    Line tool before clinical use.
+                  </div>
+                </div>
+
+                <!-- ── Articulator ── -->
+                <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:10px">
+                  <div class="param-label" style="color:var(--accent-dim)">⚙ Virtual Articulator</div>
+
+                  <!-- Load Opposing Arch -->
+                  <div style="margin-bottom:8px">
+                    <button id="btn-load-opposing" class="btn btn-sm"
+                            style="width:100%;background:rgba(139,92,246,0.1);
+                                   border-color:rgba(139,92,246,0.35);color:#c4b5fd">
+                      📂 Load Opposing Arch…
+                    </button>
+                    <div id="opposing-status"
+                         style="font-size:10px;color:var(--text-dim);margin-top:4px;
+                                font-family:var(--font-mono);min-height:13px"></div>
+                  </div>
+                  <input type="file" id="opposing-file-input"
+                         accept=".stl,.obj,.ply" style="display:none"/>
+
+                  <div class="param-label">Condylar Inc. (°)</div>
+                  <input id="art-cond-inc" type="number" class="form-input"
+                    style="height:26px;font-size:11px" min="0" max="60" step="5" value="30"/>
+                  <div class="param-label">Bennett Angle (°)</div>
+                  <input id="art-bennett" type="number" class="form-input"
+                    style="height:26px;font-size:11px" min="0" max="30" step="5" value="15"/>
+
+                  <!-- Bite Simulation slider (0–100) -->
+                  <div class="param-label" style="display:flex;justify-content:space-between">
+                    Bite Simulation
+                    <span id="art-excursion-val" style="color:var(--accent-dim);font-family:var(--font-mono)">0%</span>
+                  </div>
+                  <input id="art-excursion" type="range" class="range-slider"
+                    min="0" max="1" step="0.01" value="0"/>
+
+                  <!-- Movement mode buttons -->
+                  <div style="display:flex;gap:3px;margin:5px 0">
+                    <button class="btn btn-sm art-mode-btn active" data-mode="protrusive"
+                      style="flex:1;padding:2px 0;font-size:10px">Protrusive</button>
+                    <button class="btn btn-sm art-mode-btn" data-mode="lateral-R"
+                      style="flex:1;padding:2px 0;font-size:10px">Lat-R</button>
+                    <button class="btn btn-sm art-mode-btn" data-mode="lateral-L"
+                      style="flex:1;padding:2px 0;font-size:10px">Lat-L</button>
+                    <button class="btn btn-sm art-mode-btn" data-mode="open"
+                      style="flex:1;padding:2px 0;font-size:10px">Open</button>
+                  </div>
+
+                  <!-- Init / Reset -->
+                  <div style="display:flex;gap:4px">
+                    <button id="btn-art-init"  class="btn btn-sm" style="flex:1">
+                      ▶ Simulate Bite
+                    </button>
+                    <button id="btn-art-reset" class="btn btn-sm" style="flex:1">Reset ICP</button>
+                  </div>
+
+                  <!-- Contact points info -->
+                  <div id="art-contact-info"
+                       style="margin-top:6px;padding:5px 8px;background:var(--bg-elevated);
+                              border:1px solid var(--border);border-radius:4px;
+                              font-size:10px;color:var(--text-dim);min-height:28px;
+                              line-height:1.6">
+                    Contact points: — (init articulator first)
+                  </div>
+                </div>
+
+                <!-- ── Occlusion Heatmap ── -->
+                <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:10px">
+                  <div class="param-label" style="color:var(--accent-dim)">🦷 Occlusion Heatmap</div>
+
+                  <!-- Colour legend -->
+                  <div style="display:flex;flex-direction:column;gap:3px;margin:6px 0 8px;font-size:10px">
+                    <div style="display:flex;align-items:center;gap:6px">
+                      <div style="width:10px;height:10px;border-radius:50%;background:#f14c4c;flex-shrink:0"></div>
+                      Collision / Penetration
+                    </div>
+                    <div style="display:flex;align-items:center;gap:6px">
+                      <div style="width:10px;height:10px;border-radius:50%;background:#4ec9b0;flex-shrink:0"></div>
+                      Ideal contact (0–0.05 mm)
+                    </div>
+                    <div style="display:flex;align-items:center;gap:6px">
+                      <div style="width:10px;height:10px;border-radius:50%;background:#e8c065;flex-shrink:0"></div>
+                      Light contact (0.05–0.2 mm)
+                    </div>
+                    <div style="display:flex;align-items:center;gap:6px">
+                      <div style="width:10px;height:10px;border-radius:50%;background:#007acc;flex-shrink:0"></div>
+                      Clearance (0.2–0.5 mm)
+                    </div>
+                    <div style="display:flex;align-items:center;gap:6px">
+                      <div style="width:10px;height:10px;border-radius:50%;background:#888;flex-shrink:0"></div>
+                      No contact (&gt;0.5 mm)
+                    </div>
+                  </div>
+
+                  <div class="param-label">Opposing Arch Y</div>
+                  <input id="occ-opposing-y" type="range" class="range-slider"
+                    min="-5" max="5" step="0.05" value="2.5"/>
+                  <div style="text-align:center;font-size:10px;color:#666;margin-bottom:6px">
+                    Drag to set opposing arch plane
+                  </div>
+
+                  <div class="param-label">Clearance (mm)</div>
+                  <input id="occ-clearance" type="number" class="form-input"
+                    style="height:26px;font-size:11px" min="0.01" max="0.5" step="0.01" value="0.02"/>
+
+                  <div style="display:flex;flex-direction:column;gap:5px;margin-top:8px">
+                    <button id="btn-toggle-occlusion" class="btn btn-sm btn-primary" style="width:100%"
+                      onclick="document.getElementById('tb-occlusion').click()">
+                      🦷 Toggle Heatmap
+                    </button>
+                    <button id="btn-auto-trim" class="btn btn-sm" style="width:100%">
+                      ✂ Auto-Trim High Spots
+                    </button>
+                  </div>
+                </div>
+
+                <!-- ── Crown Generator ── -->
+                <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:10px">
+                  <div class="param-label" style="color:var(--accent-dim)">👑 Crown Generator</div>
+
+                  <div class="param-label">Cement Gap (mm)</div>
+                  <input id="crown-cement-gap" type="number" class="form-input"
+                    style="height:26px;font-size:11px" min="0.01" max="0.3" step="0.01" value="0.05"/>
+
+                  <div style="font-size:10px;color:#555;margin:3px 0 6px;line-height:1.5">
+                    Adapt crown base to margin line, then generate internal offset shell.
+                  </div>
+
+                  <div style="display:flex;flex-direction:column;gap:5px">
+                    <button id="btn-adapt-crown" class="btn btn-sm btn-primary" style="width:100%">
+                      ↕ Fit Crown to Margin
+                    </button>
+                    <button id="btn-gen-cement-gap" class="btn btn-sm" style="width:100%">
+                      🔲 Generate Cement Shell
+                    </button>
+                    <button id="btn-dispose-cement" class="btn btn-sm btn-danger" style="width:100%">
+                      🗑 Remove Shell
+                    </button>
+                  </div>
+                </div>
+
+                <div class="param-label">Shade</div>
+                <select class="form-select" style="width:100%;height:28px;font-size:12px">
+                  <option>A1</option><option selected>A2</option><option>A3</option>
+                  <option>A3.5</option><option>B1</option><option>B2</option>
+                </select>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- ═══ STEP 6: Library Selection ═══════════════════ -->
+          <div class="wizard-step" id="step-5">
+            <div class="step-title">Library Selection</div>
+            <div class="step-subtitle">Choose a tooth shape template as a starting point for design.</div>
+
+            <div class="lib-filters mt-8">
+              <input id="lib-search" class="form-input" style="width:200px;height:28px;font-size:12px" placeholder="🔍 Search…" />
+              <button class="btn btn-sm lib-filter-btn active" data-filter="all">All</button>
+              <button class="btn btn-sm lib-filter-btn" data-filter="anterior">Anterior</button>
+              <button class="btn btn-sm lib-filter-btn" data-filter="posterior">Posterior</button>
+              <select class="form-select" style="height:28px;font-size:12px;width:auto">
+                <option>All Manufacturers</option>
+                <option>Vita</option><option>Ivoclar</option><option>3Shape</option>
+                <option>Dentsply</option><option>Straumann</option><option>exocad</option>
+              </select>
+            </div>
+
+            <div style="display:flex;gap:14px;min-height:0">
+              <!-- Library grid -->
+              <div id="lib-step-grid" class="lib-grid" style="flex:1">
+
+                <!-- Anterior -->
+                <div class="lib-card" data-lib="NaturalForm 11" data-mfr="Vita" data-type="Central Incisor" data-shade="A1" data-type-group="anterior">
+                  <svg class="lib-tooth-preview" viewBox="0 0 56 64">
+                    <defs><linearGradient id="lci1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e8d8c0"/><stop offset="1" stop-color="#c8ae88"/></linearGradient></defs>
+                    <!-- root -->
+                    <path d="M22 36 Q21 46 22.5 56 Q28 62 33.5 56 Q35 46 34 36 Z" fill="rgba(200,180,140,0.3)" stroke="#b0a080" stroke-width="1"/>
+                    <!-- neck -->
+                    <line x1="18" y1="36" x2="38" y2="36" stroke="#b0a080" stroke-width="0.7" opacity="0.5"/>
+                    <!-- crown -->
+                    <path d="M17 36 Q16 28 18.5 20 Q22 12 28 11 Q34 12 37.5 20 Q40 28 39 36 Z" fill="url(#lci1)" stroke="#b09870" stroke-width="1.3"/>
+                    <!-- incisal edge highlight -->
+                    <path d="M20 21 Q28 11.5 36 21" fill="none" stroke="rgba(255,255,255,0.35)" stroke-width="1" stroke-linecap="round"/>
+                    <!-- surface detail -->
+                    <line x1="24" y1="14" x2="23" y2="32" stroke="rgba(180,150,110,0.3)" stroke-width="0.6"/>
+                    <line x1="28" y1="12" x2="28" y2="32" stroke="rgba(180,150,110,0.25)" stroke-width="0.6"/>
+                    <line x1="32" y1="14" x2="33" y2="32" stroke="rgba(180,150,110,0.3)" stroke-width="0.6"/>
+                  </svg>
+                  <div class="lib-name">NaturalForm 11</div><div class="lib-mfr">Vita · A1</div>
+                </div>
+
+                <div class="lib-card" data-lib="NaturalForm 21" data-mfr="Vita" data-type="Central Incisor" data-shade="A2" data-type-group="anterior">
+                  <svg class="lib-tooth-preview" viewBox="0 0 56 64">
+                    <defs><linearGradient id="lci2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#dccca8"/><stop offset="1" stop-color="#b89870"/></linearGradient></defs>
+                    <path d="M22 36 Q21 46 22.5 56 Q28 62 33.5 56 Q35 46 34 36 Z" fill="rgba(180,160,120,0.3)" stroke="#a09060" stroke-width="1"/>
+                    <line x1="18" y1="36" x2="38" y2="36" stroke="#a09060" stroke-width="0.7" opacity="0.5"/>
+                    <path d="M17 36 Q16 28 18.5 20 Q22 12 28 11 Q34 12 37.5 20 Q40 28 39 36 Z" fill="url(#lci2)" stroke="#a08060" stroke-width="1.3"/>
+                    <path d="M20 21 Q28 11.5 36 21" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="1" stroke-linecap="round"/>
+                    <line x1="28" y1="12" x2="28" y2="32" stroke="rgba(160,130,90,0.3)" stroke-width="0.7"/>
+                  </svg>
+                  <div class="lib-name">NaturalForm 21</div><div class="lib-mfr">Vita · A2</div>
+                </div>
+
+                <div class="lib-card" data-lib="SmileLine V11" data-mfr="Vita" data-type="Lateral Incisor" data-shade="B1" data-type-group="anterior">
+                  <svg class="lib-tooth-preview" viewBox="0 0 56 64">
+                    <defs><linearGradient id="lli1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ede4cc"/><stop offset="1" stop-color="#cdbf9a"/></linearGradient></defs>
+                    <path d="M24 36 Q23 45 24.5 55 Q28 60 31.5 55 Q33 45 32 36 Z" fill="rgba(200,185,145,0.3)" stroke="#b0a888" stroke-width="1"/>
+                    <line x1="20" y1="36" x2="36" y2="36" stroke="#b0a888" stroke-width="0.7" opacity="0.5"/>
+                    <path d="M19 36 Q18.5 28 21 21 Q24 14 28 13 Q32 14 35 21 Q37.5 28 37 36 Z" fill="url(#lli1)" stroke="#a8a080" stroke-width="1.3"/>
+                    <path d="M22 22 Q28 13 34 22" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="0.9" stroke-linecap="round"/>
+                  </svg>
+                  <div class="lib-name">SmileLine V11</div><div class="lib-mfr">Vita · B1</div>
+                </div>
+
+                <div class="lib-card" data-lib="ClassicLine C13" data-mfr="Ivoclar" data-type="Canine" data-shade="B2" data-type-group="anterior">
+                  <svg class="lib-tooth-preview" viewBox="0 0 56 64">
+                    <defs><linearGradient id="lca1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d4b880"/><stop offset="1" stop-color="#b89060"/></linearGradient></defs>
+                    <!-- long root -->
+                    <path d="M23 36 Q22 47 23.5 58 Q28 64 32.5 58 Q34 47 33 36 Z" fill="rgba(185,150,100,0.3)" stroke="#c47a30" stroke-width="1"/>
+                    <line x1="19" y1="36" x2="37" y2="36" stroke="#c47a30" stroke-width="0.7" opacity="0.5"/>
+                    <!-- crown with cusp -->
+                    <path d="M19 36 Q18 28 20 21 Q23 14 28 10 Q33 14 36 21 Q38 28 37 36 Z" fill="url(#lca1)" stroke="#c47a30" stroke-width="1.3"/>
+                    <!-- cusp highlight -->
+                    <circle cx="28" cy="10.5" r="1.5" fill="#c47a30" opacity="0.6"/>
+                    <path d="M21 22 Q28 10 35 22" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="0.9" stroke-linecap="round"/>
+                    <!-- mesial ridge -->
+                    <line x1="21" y1="23" x2="27" y2="13" stroke="rgba(180,140,80,0.3)" stroke-width="0.7"/>
+                    <line x1="35" y1="23" x2="29" y2="13" stroke="rgba(180,140,80,0.3)" stroke-width="0.7"/>
+                  </svg>
+                  <div class="lib-name">ClassicLine C13</div><div class="lib-mfr">Ivoclar · B2</div>
+                </div>
+
+                <div class="lib-card" data-lib="ArtForm C3" data-mfr="Shofu" data-type="Canine" data-shade="A2" data-type-group="anterior">
+                  <svg class="lib-tooth-preview" viewBox="0 0 56 64">
+                    <defs><linearGradient id="lca2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d8c090"/><stop offset="1" stop-color="#bcA070"/></linearGradient></defs>
+                    <path d="M23 36 Q22 47 23.5 58 Q28 64 32.5 58 Q34 47 33 36 Z" fill="rgba(185,150,100,0.3)" stroke="#c47a30" stroke-width="1"/>
+                    <line x1="19" y1="36" x2="37" y2="36" stroke="#c47a30" stroke-width="0.7" opacity="0.5"/>
+                    <path d="M19 36 Q18 28 21 21 Q24 14 28 10 Q32 14 35 21 Q38 28 37 36 Z" fill="url(#lca2)" stroke="#c47a30" stroke-width="1.3"/>
+                    <circle cx="28" cy="10.5" r="1.5" fill="#c47a30" opacity="0.55"/>
+                    <path d="M22 22 Q28 10 34 22" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="0.9" stroke-linecap="round"/>
+                  </svg>
+                  <div class="lib-name">ArtForm C3</div><div class="lib-mfr">Shofu · A2</div>
+                </div>
+
+                <div class="lib-card" data-lib="DigitalTooth D11" data-mfr="exocad" data-type="Central Incisor" data-shade="A2" data-type-group="anterior">
+                  <svg class="lib-tooth-preview" viewBox="0 0 56 64">
+                    <defs><linearGradient id="ldi1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d8c8a8"/><stop offset="1" stop-color="#b8a880"/></linearGradient></defs>
+                    <path d="M22 36 Q21 46 22.5 56 Q28 62 33.5 56 Q35 46 34 36 Z" fill="rgba(156,220,254,0.1)" stroke="#9cdcfe" stroke-width="1"/>
+                    <line x1="18" y1="36" x2="38" y2="36" stroke="#9cdcfe" stroke-width="0.7" opacity="0.4"/>
+                    <path d="M17 36 Q16 28 18.5 20 Q22 12 28 11 Q34 12 37.5 20 Q40 28 39 36 Z" fill="url(#ldi1)" stroke="#9cdcfe" stroke-width="1.5"/>
+                    <path d="M20 21 Q28 11.5 36 21" fill="none" stroke="rgba(156,220,254,0.4)" stroke-width="1" stroke-linecap="round"/>
+                    <line x1="28" y1="12" x2="28" y2="32" stroke="rgba(156,220,254,0.2)" stroke-width="0.7"/>
+                  </svg>
+                  <div class="lib-name">DigitalTooth D11</div><div class="lib-mfr">exocad · A2</div>
+                </div>
+
+                <!-- Posterior -->
+                <div class="lib-card" data-lib="ProShape 14" data-mfr="3Shape" data-type="1st Premolar" data-shade="A3" data-type-group="posterior">
+                  <svg class="lib-tooth-preview" viewBox="0 0 56 64">
+                    <defs><linearGradient id="lp1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d0b888"/><stop offset="1" stop-color="#a88c60"/></linearGradient></defs>
+                    <!-- buccal root -->
+                    <path d="M17 35 Q16 43 17.5 52 Q21 57 24 52 Q25 43 24 35 Z" fill="rgba(180,150,100,0.3)" stroke="#4a9e4a" stroke-width="1"/>
+                    <!-- lingual root -->
+                    <path d="M30 35 Q29 42 30.5 51 Q33 57 36 51 Q37 42 36 35 Z" fill="rgba(160,130,90,0.25)" stroke="#4a9e4a" stroke-width="1"/>
+                    <line x1="14" y1="35" x2="39" y2="35" stroke="#4a9e4a" stroke-width="0.7" opacity="0.5"/>
+                    <!-- crown -->
+                    <path d="M13 35 Q12 27 15 20 Q19 13 28 13 Q37 13 41 20 Q44 27 43 35 Z" fill="url(#lp1)" stroke="#4a9e4a" stroke-width="1.4"/>
+                    <!-- bicuspid cusps -->
+                    <path d="M17 21 Q23 13.5 28 14" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="0.8" stroke-linecap="round"/>
+                    <path d="M39 21 Q33 13.5 28 14" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="0.8" stroke-linecap="round"/>
+                    <line x1="28" y1="14" x2="28" y2="30" stroke="rgba(150,120,80,0.3)" stroke-width="0.7"/>
+                  </svg>
+                  <div class="lib-name">ProShape 14</div><div class="lib-mfr">3Shape · A3</div>
+                </div>
+
+                <div class="lib-card" data-lib="OcclusalPro 15" data-mfr="Kulzer" data-type="2nd Premolar" data-shade="B2" data-type-group="posterior">
+                  <svg class="lib-tooth-preview" viewBox="0 0 56 64">
+                    <defs><linearGradient id="lp2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#cbb488"/><stop offset="1" stop-color="#a08a68"/></linearGradient></defs>
+                    <path d="M17 35 Q16 43 17.5 52 Q21 57 24 52 Q25 43 24 35 Z" fill="rgba(175,145,95,0.3)" stroke="#4a9e4a" stroke-width="1"/>
+                    <path d="M30 35 Q29 42 30.5 51 Q33 57 36 51 Q37 42 36 35 Z" fill="rgba(155,125,85,0.25)" stroke="#4a9e4a" stroke-width="1"/>
+                    <line x1="14" y1="35" x2="39" y2="35" stroke="#4a9e4a" stroke-width="0.7" opacity="0.5"/>
+                    <path d="M13 35 Q12 27 15 20 Q19 13 28 13 Q37 13 41 20 Q44 27 43 35 Z" fill="url(#lp2)" stroke="#4a9e4a" stroke-width="1.4"/>
+                    <path d="M17 21 Q22 13.5 28 14" fill="none" stroke="rgba(255,255,255,0.22)" stroke-width="0.8" stroke-linecap="round"/>
+                    <path d="M39 21 Q34 13.5 28 14" fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="0.8" stroke-linecap="round"/>
+                    <line x1="28" y1="14" x2="28" y2="30" stroke="rgba(145,115,75,0.3)" stroke-width="0.7"/>
+                  </svg>
+                  <div class="lib-name">OcclusalPro 15</div><div class="lib-mfr">Kulzer · B2</div>
+                </div>
+
+                <div class="lib-card" data-lib="MolarMaster 16" data-mfr="Dentsply" data-type="1st Molar" data-shade="A3" data-type-group="posterior">
+                  <svg class="lib-tooth-preview" viewBox="0 0 56 64">
+                    <defs><linearGradient id="lm1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c8a870"/><stop offset="1" stop-color="#9c7c4c"/></linearGradient></defs>
+                    <!-- 3 roots -->
+                    <path d="M11 34 Q10 42 11.5 52 Q15 57 18 52 Q19 42 18 34 Z" fill="rgba(180,150,100,0.3)" stroke="#8e4ea8" stroke-width="1"/>
+                    <path d="M22 34 Q21 41 22.5 51 Q26 56 29 51 Q30 41 29 34 Z" fill="rgba(160,130,85,0.25)" stroke="#8e4ea8" stroke-width="1"/>
+                    <path d="M35 34 Q34 42 35.5 52 Q39 57 42 52 Q43 42 42 34 Z" fill="rgba(155,125,80,0.25)" stroke="#8e4ea8" stroke-width="1"/>
+                    <line x1="8" y1="34" x2="45" y2="34" stroke="#8e4ea8" stroke-width="0.7" opacity="0.5"/>
+                    <!-- wide molar crown -->
+                    <path d="M7 34 Q6 26 9 19 Q14 12 28 12 Q42 12 47 19 Q50 26 49 34 Z" fill="url(#lm1)" stroke="#8e4ea8" stroke-width="1.5"/>
+                    <!-- occlusal pattern -->
+                    <path d="M12 22 Q19 13 28 13 Q37 13 44 22" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="0.8" stroke-linecap="round"/>
+                    <line x1="28" y1="13" x2="28" y2="30" stroke="rgba(150,100,60,0.3)" stroke-width="0.8"/>
+                    <line x1="9" y1="24" x2="47" y2="24" stroke="rgba(150,100,60,0.2)" stroke-width="0.6"/>
+                    <circle cx="16" cy="19" r="1" fill="#8e4ea8" opacity="0.4"/>
+                    <circle cx="28" cy="15" r="1" fill="#8e4ea8" opacity="0.4"/>
+                    <circle cx="40" cy="19" r="1" fill="#8e4ea8" opacity="0.4"/>
+                    <circle cx="12" cy="27" r="1" fill="#8e4ea8" opacity="0.35"/>
+                    <circle cx="44" cy="27" r="1" fill="#8e4ea8" opacity="0.35"/>
+                  </svg>
+                  <div class="lib-name">MolarMaster 16</div><div class="lib-mfr">Dentsply · A3</div>
+                </div>
+
+                <div class="lib-card" data-lib="ClassicMolar 46" data-mfr="Ivoclar" data-type="1st Molar" data-shade="A4" data-type-group="posterior">
+                  <svg class="lib-tooth-preview" viewBox="0 0 56 64">
+                    <defs><linearGradient id="lm2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#bca06a"/><stop offset="1" stop-color="#8c7040"/></linearGradient></defs>
+                    <!-- 2 roots lower molar -->
+                    <path d="M13 34 Q12 43 13.5 53 Q18 59 22 53 Q23 43 22 34 Z" fill="rgba(165,135,90,0.3)" stroke="#8e4ea8" stroke-width="1"/>
+                    <path d="M32 34 Q31 43 32.5 53 Q37 59 41 53 Q42 43 41 34 Z" fill="rgba(145,115,75,0.25)" stroke="#8e4ea8" stroke-width="1"/>
+                    <line x1="8" y1="34" x2="45" y2="34" stroke="#8e4ea8" stroke-width="0.7" opacity="0.5"/>
+                    <path d="M7 34 Q6 26 9 19 Q14 12 28 12 Q42 12 47 19 Q50 26 49 34 Z" fill="url(#lm2)" stroke="#8e4ea8" stroke-width="1.5"/>
+                    <path d="M12 22 Q19 13 28 13 Q37 13 44 22" fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="0.8" stroke-linecap="round"/>
+                    <line x1="28" y1="13" x2="28" y2="30" stroke="rgba(130,90,50,0.3)" stroke-width="0.8"/>
+                    <line x1="9" y1="24" x2="47" y2="24" stroke="rgba(130,90,50,0.2)" stroke-width="0.6"/>
+                    <circle cx="16" cy="19" r="1.1" fill="#8e4ea8" opacity="0.4"/>
+                    <circle cx="28" cy="15" r="1.1" fill="#8e4ea8" opacity="0.4"/>
+                    <circle cx="40" cy="19" r="1.1" fill="#8e4ea8" opacity="0.4"/>
+                  </svg>
+                  <div class="lib-name">ClassicMolar 46</div><div class="lib-mfr">Ivoclar · A4</div>
+                </div>
+
+                <div class="lib-card" data-lib="ZircForm Z16" data-mfr="Zenostar" data-type="1st Molar" data-shade="A2" data-type-group="posterior">
+                  <svg class="lib-tooth-preview" viewBox="0 0 56 64">
+                    <defs><linearGradient id="lm3" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e0d4b8"/><stop offset="1" stop-color="#c0b090"/></linearGradient></defs>
+                    <path d="M13 34 Q12 43 13.5 53 Q18 59 22 53 Q23 43 22 34 Z" fill="rgba(200,185,155,0.3)" stroke="#8e4ea8" stroke-width="1"/>
+                    <path d="M32 34 Q31 43 32.5 53 Q37 59 41 53 Q42 43 41 34 Z" fill="rgba(185,170,140,0.25)" stroke="#8e4ea8" stroke-width="1"/>
+                    <line x1="8" y1="34" x2="45" y2="34" stroke="#8e4ea8" stroke-width="0.7" opacity="0.5"/>
+                    <path d="M7 34 Q6 26 9 19 Q14 12 28 12 Q42 12 47 19 Q50 26 49 34 Z" fill="url(#lm3)" stroke="#a78bfa" stroke-width="1.8"/>
+                    <path d="M12 22 Q19 13 28 13 Q37 13 44 22" fill="none" stroke="rgba(255,255,255,0.28)" stroke-width="0.9" stroke-linecap="round"/>
+                    <line x1="28" y1="13" x2="28" y2="30" stroke="rgba(167,139,250,0.25)" stroke-width="0.8"/>
+                    <line x1="9" y1="24" x2="47" y2="24" stroke="rgba(167,139,250,0.2)" stroke-width="0.6"/>
+                    <circle cx="16" cy="19" r="1" fill="#a78bfa" opacity="0.5"/>
+                    <circle cx="28" cy="15" r="1" fill="#a78bfa" opacity="0.5"/>
+                    <circle cx="40" cy="19" r="1" fill="#a78bfa" opacity="0.5"/>
+                  </svg>
+                  <div class="lib-name">ZircForm Z16</div><div class="lib-mfr">Zenostar · A2</div>
+                </div>
+
+                <div class="lib-card" data-lib="ImplantFit IC" data-mfr="Straumann" data-type="Implant Crown" data-shade="A1" data-type-group="posterior">
+                  <svg class="lib-tooth-preview" viewBox="0 0 56 64">
+                    <defs><linearGradient id="limp1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c8dcf0"/><stop offset="1" stop-color="#90b8d8"/></linearGradient></defs>
+                    <!-- implant fixture -->
+                    <rect x="23" y="48" width="10" height="14" rx="2" fill="rgba(144,184,216,0.2)" stroke="#9cdcfe" stroke-width="1"/>
+                    <!-- fixture threads -->
+                    <line x1="22" y1="51" x2="34" y2="51" stroke="#9cdcfe" stroke-width="0.5" opacity="0.4"/>
+                    <line x1="22" y1="54" x2="34" y2="54" stroke="#9cdcfe" stroke-width="0.5" opacity="0.4"/>
+                    <line x1="22" y1="57" x2="34" y2="57" stroke="#9cdcfe" stroke-width="0.5" opacity="0.4"/>
+                    <!-- abutment -->
+                    <path d="M25 36 L24 48 L32 48 L31 36 Z" fill="rgba(156,220,254,0.15)" stroke="#9cdcfe" stroke-width="1"/>
+                    <line x1="22" y1="36" x2="34" y2="36" stroke="#9cdcfe" stroke-width="0.7" opacity="0.5"/>
+                    <!-- crown -->
+                    <path d="M14 36 Q13 27 16 20 Q20 13 28 12 Q36 13 40 20 Q43 27 42 36 Z" fill="url(#limp1)" stroke="#9cdcfe" stroke-width="1.5"/>
+                    <path d="M17 21 Q22 13 28 12 Q34 13 39 21" fill="none" stroke="rgba(156,220,254,0.35)" stroke-width="0.9" stroke-linecap="round"/>
+                    <line x1="28" y1="12" x2="28" y2="32" stroke="rgba(156,220,254,0.2)" stroke-width="0.7"/>
+                  </svg>
+                  <div class="lib-name">ImplantFit IC</div><div class="lib-mfr">Straumann · A1</div>
+                </div>
+
+              </div>
+
+              <!-- Detail panel -->
+              <div style="width:200px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:16px;flex-shrink:0;display:flex;flex-direction:column;gap:10px;">
+                <div class="section-hdr">Selected</div>
+                <svg viewBox="0 0 80 70" style="width:80px;height:70px;margin:0 auto;display:block">
+                  <rect x="8" y="6" width="64" height="30" rx="8" fill="#c8b898" stroke="#9cdcfe" stroke-width="2"/>
+                  <rect x="16" y="34" width="20" height="26" rx="5" fill="#baa888" stroke="#9cdcfe" stroke-width="1.5"/>
+                  <rect x="44" y="34" width="20" height="26" rx="5" fill="#baa888" stroke="#9cdcfe" stroke-width="1.5"/>
+                </svg>
+                <div id="lib-detail-name"  style="font-size:13px;font-weight:bold;color:var(--text);text-align:center">—</div>
+                <div style="font-size:11px;color:#666;display:flex;flex-direction:column;gap:4px">
+                  <div>Manufacturer: <span id="lib-detail-mfr"   style="color:var(--text)">—</span></div>
+                  <div>Type: <span id="lib-detail-type"  style="color:var(--text)">—</span></div>
+                  <div>Shade: <span id="lib-detail-shade" style="color:var(--text)">—</span></div>
+                </div>
+                <div style="font-size:11px;color:var(--green);line-height:1.6">
+                  ✔ Universal<br>✔ FDI Numbering<br>✔ CAD/CAM Ready
+                </div>
+                <!-- Load status hint — updated by _loadLibraryShape() -->
+                <div id="lib-load-hint"
+                     style="font-size:10.5px;color:var(--text-dim);margin-top:6px;
+                            min-height:14px;text-align:center;line-height:1.4">
+                  Click a shape to load it in the viewport
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ═══ STEP 7: Review & Export ══════════════════════ -->
+          <div class="wizard-step" id="step-6">
+            <div class="step-title">Review &amp; Export</div>
+            <div class="step-subtitle">Review all case details before exporting the final design.</div>
+
+            <div class="review-grid mt-8">
+              <!-- Summary -->
+              <div class="review-card">
+                <h3>Case Summary</h3>
+                <div class="review-row"><span class="review-key">Patient Name:</span> <span id="rv-patient" class="review-val">—</span></div>
+                <div class="review-row"><span class="review-key">Case ID:</span>       <span id="rv-caseid"  class="review-val">—</span></div>
+                <div class="review-row"><span class="review-key">Date:</span>          <span id="rv-date"    class="review-val">—</span></div>
+                <div class="review-row"><span class="review-key">Clinician:</span>     <span id="rv-clinician" class="review-val">—</span></div>
+                <div class="review-row"><span class="review-key">Scanner:</span>       <span id="rv-scanner" class="review-val">—</span></div>
+                <div class="review-row"><span class="review-key">Jaw:</span>           <span id="rv-jaw"     class="review-val">—</span></div>
+                <div class="review-row"><span class="review-key">Selected Teeth:</span><span id="rv-teeth"   class="review-val">—</span></div>
+                <div class="review-row"><span class="review-key">Restoration:</span>   <span id="rv-restoration" class="review-val">—</span></div>
+                <div class="review-row"><span class="review-key">Library Item:</span>  <span id="rv-library" class="review-val">—</span></div>
+              </div>
+
+              <!-- Validation -->
+              <div class="review-card">
+                <h3>Validation</h3>
+                <div style="margin-bottom:8px;padding:6px 8px;background:#1a0a00;
+                     border:1px solid #e8c065;border-radius:5px;
+                     font-size:10px;color:#e8c065;line-height:1.5">
+                  ⚠ <b>Visual Aid Only</b> — Not clinical approval.<br>
+                  Results must be reviewed by a qualified dental professional<br>
+                  before manufacturing or delivering any restoration.
+                </div>
+                <div id="review-summary-msg"
+                     style="margin-bottom:8px;font-size:11px;font-weight:500;
+                            min-height:16px;transition:color .2s"></div>
+                <div id="chk-scan"    class="check-row"><span class="check-icon">⬜</span> Scan data imported</div>
+                <div id="chk-teeth"   class="check-row"><span class="check-icon">⬜</span> Teeth selected</div>
+                <div id="chk-rest"    class="check-row"><span class="check-icon">⬜</span> Restoration type chosen</div>
+                <div id="chk-margin"  class="check-row"><span class="check-icon check-ok">✅</span><span style="color:var(--green)"> Margin line defined</span></div>
+                <div id="chk-thick"   class="check-row"><span class="check-icon check-ok">✅</span><span style="color:var(--green)"> Minimum thickness met</span></div>
+                <div id="chk-contact" class="check-row"><span class="check-icon check-ok">✅</span><span style="color:var(--green)"> Proximal contacts verified</span></div>
+              </div>
+            </div>
+
+            <!-- ══ Manufacturing Preview panel ══════════════════ -->
+            <div class="form-card" id="manufacturing-panel" style="margin-top:14px">
+              <div class="section-hdr" style="margin-bottom:12px;display:flex;align-items:center;gap:8px">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2" y="3" width="20" height="14" rx="2"/><rect x="6" y="7" width="5" height="6" rx="1"/><rect x="13" y="7" width="5" height="6" rx="1"/></svg>
+                Manufacturing Preview
+                <span style="font-size:10px;font-weight:400;color:var(--text-dim);margin-left:4px">— visual estimate only, not CAM output</span>
+              </div>
+              <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+                <div style="display:flex;align-items:center;gap:8px">
+                  <label class="form-label" style="margin:0;white-space:nowrap">Blank size:</label>
+                  <select id="blank-size-select" class="form-select" style="height:28px;font-size:12px;width:210px">
+                    <option>98 × 14 mm (Standard)</option>
+                    <option>98 × 18 mm</option>
+                    <option>98 × 20 mm (Extended)</option>
+                    <option>71 × 14 mm (Small)</option>
+                    <option>40 × 28 mm (Disc)</option>
+                  </select>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px">
+                  <label class="form-label" style="margin:0">Padding (mm):</label>
+                  <input id="nesting-padding-review" type="number" class="form-input" style="height:26px;font-size:11px;width:60px" min="0.5" max="10" step="0.5" value="2"/>
+                </div>
+                <button id="btn-generate-supports" class="btn btn-sm" style="background:rgba(245,158,11,0.1);border-color:rgba(245,158,11,0.35);color:var(--yellow-dim)">⚙ Add Supports</button>
+                <button id="btn-nesting-refresh-review" class="btn btn-sm">🔄 Refresh</button>
+              </div>
+              <div style="margin-bottom:10px;padding:6px 10px;background:rgba(245,158,11,0.06);border:1px solid rgba(245,158,11,0.25);border-radius:5px;font-size:10.5px;color:var(--yellow-dim);line-height:1.6">
+                ⚠ <b>PREVIEW ONLY</b> — Support structures are visual approximations. Review with a qualified CAM engineer before manufacturing.
+              </div>
+              <canvas id="nesting-canvas-review" width="560" height="200"
+                style="width:100%;border:1px solid var(--border);border-radius:6px;background:#0e1018;display:block"></canvas>
+              <div id="supports-status" style="margin-top:7px;font-size:11px;color:var(--text-dim);min-height:16px"></div>
+            </div><!-- /manufacturing-panel -->
+
+            <!-- Export options -->
+            <div class="form-card" id="export-options-card">
+              <div class="section-hdr" style="margin-bottom:14px">Export Options</div>
+              <div class="form-grid" style="grid-template-columns:130px 1fr;gap:11px 16px;align-items:center">
+
+                <label class="form-label">Format:</label>
+                <div style="display:flex;flex-direction:column;gap:4px">
+                  <select id="export-format" class="form-select" style="max-width:280px">
+                    <option value="STL Binary">STL Binary  — fastest, smallest</option>
+                    <option value="STL ASCII">STL ASCII  — human-readable</option>
+                    <option value="OBJ">OBJ + MTL  — with normals &amp; material</option>
+                    <option value="PLY Binary">PLY Binary  — with normals</option>
+                    <option value="PLY ASCII">PLY ASCII  — human-readable</option>
+                    <option value="3MF">3MF (XML)  — 3D Manufacturing Format</option>
+                  </select>
+                  <div id="export-size-preview"
+                       style="font-size:11px;color:var(--text-dim);padding-left:2px">
+                    — select a format to see estimated size
+                  </div>
+                </div>
+
+                <label class="form-label">Units:</label>
+                <select id="export-units" class="form-select" style="max-width:280px">
+                  <option value="mm">Millimeters (mm)  — recommended</option>
+                  <option value="in">Inches (in)</option>
+                </select>
+
+                <span></span>
+                <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text)">
+                  <input id="export-margin-line" type="checkbox" checked />
+                  Embed margin line as OBJ annotation (when applicable)
+                </label>
+
+              </div>
+
+              <!-- Mesh summary row -->
+              <div id="export-mesh-summary"
+                   style="margin-top:14px;padding:10px 12px;background:var(--bg3);
+                          border-radius:5px;font-size:12px;color:var(--text-muted);
+                          display:flex;gap:24px;flex-wrap:wrap">
+                <span>Mesh: <b id="esm-tris" style="color:var(--text)">—</b> triangles</span>
+                <span>Vertices: <b id="esm-verts" style="color:var(--text)">—</b></span>
+                <span>Dimensions: <b id="esm-dims" style="color:var(--text)">—</b></span>
+              </div>
+            </div>
+
+            <div id="export-progress-wrap" class="progress-wrap hidden">
+              <div id="export-prog-fill" class="progress-fill"></div>
+            </div>
+            <div id="export-status" style="font-size:13px;margin:6px 0;min-height:18px;"></div>
+
+            <div class="flex-row" style="justify-content:flex-end;gap:10px;margin-top:8px">
+              <button id="btn-save-project" class="btn">💾 Save Project</button>
+              <button id="btn-export" class="btn btn-primary" style="min-width:170px">
+                📤 Export Design
+              </button>
+            </div>
+          </div>
+
+        </div><!-- /wizard-content -->
+
+        <!-- Wizard Nav Bar -->
+        <div id="wizard-nav">
+          <button id="btn-back" class="btn" disabled>◀ Back</button>
+          <div id="step-counter">Step 1 of 7</div>
+          <button id="btn-next" class="btn btn-primary">Next ▶</button>
+        </div>
+
+      </div><!-- /wizard-panel -->
+    </div><!-- /central -->
+
+    <div id="right-resize" class="resize-handle-v"></div>
+
+    <!-- ── Right Dock ───────────────────────────────────────── -->
+    <div id="right-dock" class="dock">
+
+      <div class="dock-section-header">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right:6px"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 010 14.14M4.93 4.93a10 10 0 000 14.14"/></svg>
+        Properties
+      </div>
+      <div id="props-panel">
+        <div class="prop-group">
+          <div class="section-hdr" style="margin-bottom:8px">Material</div>
+          <select class="form-select" style="width:100%;margin-bottom:8px">
+            <option>Zirconia (3Y-TZP)</option>
+            <option>Zirconia (5Y-TZP)</option>
+            <option>Lithium Disilicate</option>
+            <option>PMMA (Temporary)</option>
+            <option>Composite Resin</option>
+            <option>Metal (CoCr)</option>
+            <option>Titanium</option>
+            <option>Wax</option>
+          </select>
+          <div class="prop-grid">
+            <span class="prop-label">Thickness</span>
+            <span class="prop-val">1.2 mm</span>
+            <span class="prop-label">Occlusal</span>
+            <span class="prop-val">1.5 mm</span>
+            <span class="prop-label">Spacing</span>
+            <span class="prop-val">0.05 mm</span>
+          </div>
+        </div>
+        <div class="prop-group">
+          <div class="section-hdr" style="margin-bottom:8px">Shade</div>
+          <select class="form-select" style="width:100%;margin-bottom:8px">
+            <option>A1</option><option selected>A2</option><option>A3</option>
+            <option>A3.5</option><option>B1</option><option>B2</option>
+            <option>C1</option><option>C2</option><option>D2</option>
+          </select>
+          <div class="prop-label" style="margin-bottom:4px">Surface Texture</div>
+          <input type="range" class="range-slider" min="0" max="100" value="50" />
+        </div>
+        <div class="prop-group">
+          <div class="section-hdr" style="margin-bottom:8px">Stump Shade</div>
+          <select class="form-select" style="width:100%">
+            <option>ST1</option><option>ST2</option><option>ST3</option>
+            <option>ST4</option><option>ST5</option><option>None</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="dock-separator"></div>
+      <div class="dock-section-header">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right:6px"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
+        Tooth Library
+      </div>
+      <div id="tooth-library">
+
+        <div class="lib-thumb" data-shape="Central Incisor">
+          <svg class="lib-thumb-svg" viewBox="0 0 28 44" fill="none">
+            <path d="M9 26 Q8.5 33 9.5 40 Q14 44 18.5 40 Q19.5 33 19 26 Z" fill="rgba(96,165,250,0.15)" stroke="#60a5fa" stroke-width="1"/>
+            <path d="M7 26 Q6.5 20 8.5 14 Q11 8 14 8 Q17 8 19.5 14 Q21.5 20 21 26 Z" fill="rgba(96,165,250,0.2)" stroke="#60a5fa" stroke-width="1.2"/>
+          </svg>
+          <span class="lib-thumb-name">Central<br>Incisor</span>
+        </div>
+
+        <div class="lib-thumb" data-shape="Lateral Incisor">
+          <svg class="lib-thumb-svg" viewBox="0 0 28 44" fill="none">
+            <path d="M10 26 Q9.5 32 10.5 39 Q14 43 17.5 39 Q18.5 32 18 26 Z" fill="rgba(96,165,250,0.15)" stroke="#60a5fa" stroke-width="1"/>
+            <path d="M8 26 Q7.5 20 9.5 15 Q12 9 14 9 Q16 9 18.5 15 Q20.5 20 20 26 Z" fill="rgba(96,165,250,0.2)" stroke="#60a5fa" stroke-width="1.2"/>
+          </svg>
+          <span class="lib-thumb-name">Lateral<br>Incisor</span>
+        </div>
+
+        <div class="lib-thumb" data-shape="Canine">
+          <svg class="lib-thumb-svg" viewBox="0 0 28 44" fill="none">
+            <path d="M10 26 Q9 33 10 40 Q14 44 18 40 Q19 33 18 26 Z" fill="rgba(251,146,60,0.15)" stroke="#fb923c" stroke-width="1"/>
+            <path d="M8 26 Q7 19 9.5 13 Q12 7 14 6 Q16 7 18.5 13 Q21 19 20 26 Z" fill="rgba(251,146,60,0.2)" stroke="#fb923c" stroke-width="1.2"/>
+            <circle cx="14" cy="6.5" r="1.2" fill="#fb923c" opacity="0.6"/>
+          </svg>
+          <span class="lib-thumb-name">Canine</span>
+        </div>
+
+        <div class="lib-thumb" data-shape="1st Premolar">
+          <svg class="lib-thumb-svg" viewBox="0 0 28 44" fill="none">
+            <path d="M8 26 Q7 32 7.5 39 Q10 43 13 39 Q14 33 13.5 26 Z" fill="rgba(52,211,153,0.15)" stroke="#34d399" stroke-width="1"/>
+            <path d="M15 26 Q14 31 15 38 Q17.5 43 20 38 Q21 32 20.5 26 Z" fill="rgba(52,211,153,0.12)" stroke="#34d399" stroke-width="1"/>
+            <path d="M6 26 Q5.5 20 7.5 14 Q10 8 14 8 Q18 8 20.5 14 Q22.5 20 22 26 Z" fill="rgba(52,211,153,0.2)" stroke="#34d399" stroke-width="1.2"/>
+            <line x1="14" y1="8.5" x2="14" y2="22" stroke="#34d399" stroke-width="0.6" opacity="0.4"/>
+          </svg>
+          <span class="lib-thumb-name">1st<br>Premolar</span>
+        </div>
+
+        <div class="lib-thumb" data-shape="2nd Premolar">
+          <svg class="lib-thumb-svg" viewBox="0 0 28 44" fill="none">
+            <path d="M8 26 Q7 32 7.5 39 Q10 43 13 39 Q14 33 13.5 26 Z" fill="rgba(52,211,153,0.15)" stroke="#34d399" stroke-width="1"/>
+            <path d="M15 26 Q14 31 15 38 Q17.5 43 20 38 Q21 32 20.5 26 Z" fill="rgba(52,211,153,0.12)" stroke="#34d399" stroke-width="1"/>
+            <path d="M6 26 Q5 19 7.5 13 Q10.5 7 14 7 Q17.5 7 20.5 13 Q23 19 22 26 Z" fill="rgba(52,211,153,0.2)" stroke="#34d399" stroke-width="1.2"/>
+            <line x1="14" y1="7.5" x2="14" y2="22" stroke="#34d399" stroke-width="0.6" opacity="0.4"/>
+          </svg>
+          <span class="lib-thumb-name">2nd<br>Premolar</span>
+        </div>
+
+        <div class="lib-thumb" data-shape="1st Molar">
+          <svg class="lib-thumb-svg" viewBox="0 0 28 44" fill="none">
+            <path d="M5 26 Q4.5 32 5 39 Q7.5 43 10 39 Q11 33 10 26 Z" fill="rgba(167,139,250,0.15)" stroke="#a78bfa" stroke-width="0.9"/>
+            <path d="M12 26 Q11.5 32 12.5 38 Q15 42 17.5 38 Q18.5 32 18 26 Z" fill="rgba(167,139,250,0.12)" stroke="#a78bfa" stroke-width="0.9"/>
+            <path d="M19.5 26 Q19 32 20 39 Q22 43 24.5 39 Q25.5 33 25 26 Z" fill="rgba(167,139,250,0.1)" stroke="#a78bfa" stroke-width="0.9"/>
+            <path d="M3 26 Q2.5 19 5 13 Q8.5 7 14 7 Q19.5 7 23 13 Q25.5 19 25 26 Z" fill="rgba(167,139,250,0.2)" stroke="#a78bfa" stroke-width="1.3"/>
+            <line x1="14" y1="7.5" x2="14" y2="22" stroke="#a78bfa" stroke-width="0.6" opacity="0.35"/>
+            <line x1="4" y1="17" x2="24" y2="17" stroke="#a78bfa" stroke-width="0.5" opacity="0.25"/>
+            <circle cx="8" cy="13" r="0.8" fill="#a78bfa" opacity="0.4"/>
+            <circle cx="14" cy="10" r="0.8" fill="#a78bfa" opacity="0.4"/>
+            <circle cx="20" cy="13" r="0.8" fill="#a78bfa" opacity="0.4"/>
+          </svg>
+          <span class="lib-thumb-name">1st Molar</span>
+        </div>
+
+        <div class="lib-thumb" data-shape="2nd Molar">
+          <svg class="lib-thumb-svg" viewBox="0 0 28 44" fill="none">
+            <path d="M5 26 Q4.5 32 5 39 Q7.5 43 10 39 Q11 33 10 26 Z" fill="rgba(167,139,250,0.15)" stroke="#a78bfa" stroke-width="0.9"/>
+            <path d="M19.5 26 Q19 32 20 39 Q22 43 24.5 39 Q25.5 33 25 26 Z" fill="rgba(167,139,250,0.1)" stroke="#a78bfa" stroke-width="0.9"/>
+            <path d="M3 26 Q2.5 19 5 13 Q8.5 7 14 7 Q19.5 7 23 13 Q25.5 19 25 26 Z" fill="rgba(167,139,250,0.2)" stroke="#a78bfa" stroke-width="1.3"/>
+            <line x1="14" y1="7.5" x2="14" y2="22" stroke="#a78bfa" stroke-width="0.6" opacity="0.3"/>
+            <line x1="4" y1="17" x2="24" y2="17" stroke="#a78bfa" stroke-width="0.5" opacity="0.2"/>
+          </svg>
+          <span class="lib-thumb-name">2nd Molar</span>
+        </div>
+
+        <div class="lib-thumb" data-shape="3rd Molar">
+          <svg class="lib-thumb-svg" viewBox="0 0 28 44" fill="none">
+            <path d="M6 26 Q5.5 31 6 38 Q8 42 10.5 38 Q11.5 33 11 26 Z" fill="rgba(167,139,250,0.15)" stroke="#a78bfa" stroke-width="0.9"/>
+            <path d="M18 26 Q17.5 31 18.5 38 Q20.5 42 23 38 Q24 33 23.5 26 Z" fill="rgba(167,139,250,0.1)" stroke="#a78bfa" stroke-width="0.9"/>
+            <path d="M4 26 Q3.5 19 6 14 Q9 8 14 8 Q19 8 22 14 Q24.5 19 24 26 Z" fill="rgba(167,139,250,0.18)" stroke="#a78bfa" stroke-width="1.2"/>
+            <line x1="14" y1="8.5" x2="14" y2="22" stroke="#a78bfa" stroke-width="0.5" opacity="0.3"/>
+          </svg>
+          <span class="lib-thumb-name">3rd Molar</span>
+        </div>
+
+        <div class="lib-thumb" data-shape="Implant Crown">
+          <svg class="lib-thumb-svg" viewBox="0 0 28 44" fill="none">
+            <rect x="11" y="34" width="6" height="10" rx="1.5" fill="rgba(156,220,254,0.15)" stroke="#9cdcfe" stroke-width="0.9"/>
+            <line x1="10" y1="36" x2="18" y2="36" stroke="#9cdcfe" stroke-width="0.5" opacity="0.4"/>
+            <line x1="10" y1="39" x2="18" y2="39" stroke="#9cdcfe" stroke-width="0.5" opacity="0.4"/>
+            <line x1="10" y1="42" x2="18" y2="42" stroke="#9cdcfe" stroke-width="0.5" opacity="0.4"/>
+            <path d="M12.5 26 L12 34 L16 34 L15.5 26 Z" fill="rgba(156,220,254,0.12)" stroke="#9cdcfe" stroke-width="0.8"/>
+            <path d="M6 26 Q5.5 19 8 13 Q11 7 14 7 Q17 7 20 13 Q22.5 19 22 26 Z" fill="rgba(156,220,254,0.2)" stroke="#9cdcfe" stroke-width="1.3"/>
+            <path d="M8 14 Q11 7.5 14 7 Q17 7.5 20 14" fill="none" stroke="rgba(156,220,254,0.3)" stroke-width="0.7" stroke-linecap="round"/>
+          </svg>
+          <span class="lib-thumb-name">Implant<br>Crown</span>
+        </div>
+
+        <div class="lib-thumb" data-shape="Veneer">
+          <svg class="lib-thumb-svg" viewBox="0 0 28 44" fill="none">
+            <path d="M9 26 Q8.5 32 9.5 38 Q14 42 18.5 38 Q19.5 32 19 26 Z" fill="rgba(96,165,250,0.1)" stroke="#60a5fa" stroke-width="0.8" stroke-dasharray="2,1"/>
+            <path d="M7 26 Q6.5 21 8.5 15 Q11 9 14 9 Q17 9 19.5 15 Q21.5 21 21 26 Z" fill="rgba(96,165,250,0.18)" stroke="#60a5fa" stroke-width="1.2"/>
+            <!-- veneer shell (thin overlay) -->
+            <path d="M7.5 25.5 Q7 20 9 14.5 Q11 9.5 14 9 Q17 9.5 19 14.5 Q21 20 20.5 25.5 Z" fill="none" stroke="rgba(156,220,254,0.6)" stroke-width="2"/>
+          </svg>
+          <span class="lib-thumb-name">Veneer</span>
+        </div>
+
+        <div class="lib-thumb" data-shape="Inlay">
+          <svg class="lib-thumb-svg" viewBox="0 0 28 44" fill="none">
+            <path d="M4 26 Q3.5 20 6 14 Q9 8 14 8 Q19 8 22 14 Q24.5 20 24 26 Z" fill="rgba(52,211,153,0.1)" stroke="rgba(52,211,153,0.3)" stroke-width="1"/>
+            <!-- inlay cavity highlight -->
+            <path d="M9 22 Q11.5 14 14 13 Q16.5 14 19 22 Q17 26 14 26 Q11 26 9 22 Z" fill="rgba(52,211,153,0.3)" stroke="#34d399" stroke-width="1.2"/>
+          </svg>
+          <span class="lib-thumb-name">Inlay</span>
+        </div>
+
+        <div class="lib-thumb" data-shape="Onlay">
+          <svg class="lib-thumb-svg" viewBox="0 0 28 44" fill="none">
+            <path d="M3 26 Q2.5 19 5 13 Q8.5 7 14 7 Q19.5 7 23 13 Q25.5 19 25 26 Z" fill="rgba(52,211,153,0.1)" stroke="rgba(52,211,153,0.3)" stroke-width="1"/>
+            <!-- onlay coverage -->
+            <path d="M5 22 Q6.5 12 14 10 Q21.5 12 23 22 Q21 27 14 27 Q7 27 5 22 Z" fill="rgba(52,211,153,0.28)" stroke="#34d399" stroke-width="1.3"/>
+            <circle cx="8" cy="16" r="1" fill="#34d399" opacity="0.5"/>
+            <circle cx="14" cy="13" r="1" fill="#34d399" opacity="0.5"/>
+            <circle cx="20" cy="16" r="1" fill="#34d399" opacity="0.5"/>
+          </svg>
+          <span class="lib-thumb-name">Onlay</span>
+        </div>
+
+      </div>
+
+    </div><!-- /right-dock -->
+
+  </div><!-- /main-body -->
+
+  <!-- ── Status Bar ───────────────────────────────────────── -->
+  <div id="statusbar">
+    <div class="sb-item">
+      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:5px;opacity:0.7"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      Scanner: —
+    </div>
+    <div id="sb-case" class="sb-item">Case: —</div>
+    <div id="sb-step" class="sb-item">Step: New Case</div>
+    <div id="sb-msg"></div>
+    <div class="sb-item">
+      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:5px;opacity:0.7"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+      DentalCAD <span data-app-version>v3.0</span>
+    </div>
+  </div>
+
+</div><!-- /app -->
+
+
+<!-- ════════════════════════════════════════════════════════════
+     MODALS
+═════════════════════════════════════════════════════════════ -->
+
+<!-- Modules Modal -->
+<div id="modules-modal" class="modal-backdrop">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Available Modules</div>
+      <input id="modules-search" class="form-input" style="width:200px;height:28px;font-size:12px;margin-right:10px" placeholder="🔍 Search…" />
+      <button class="modal-close" data-close-modal="modules-modal">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="modules-modal-grid">
+
+        <div class="module-card" style="border-left-color:#007acc">
+          <div class="module-card-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9l3 11h14l3-11"/><path d="M2 9h20"/><path d="M7 9V5l5 4 5-4v4"/></svg></div>
+          <div class="module-card-info">
+            <div class="module-card-name">Crown &amp; Bridge</div>
+            <div class="module-card-desc">Design single crowns, multi-unit bridges, and veneers with intelligent margin detection.</div>
+          </div>
+          <div class="module-card-badge badge-active">Active</div>
+        </div>
+
+        <div class="module-card" style="border-left-color:#4ec9b0">
+          <div class="module-card-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="2" x2="12" y2="22"/><path d="M8 6h8M7 10h10M8 14h8M9 18h6"/></svg></div>
+          <div class="module-card-info">
+            <div class="module-card-name">Implant Module</div>
+            <div class="module-card-desc">Implant-supported crowns, bridges, and bars. Supports all major implant systems.</div>
+          </div>
+          <div class="module-card-badge badge-active">Active</div>
+        </div>
+
+        <div class="module-card" style="border-left-color:#dcdcaa">
+          <div class="module-card-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="9" width="20" height="6" rx="3"/><circle cx="7" cy="12" r="2"/><circle cx="17" cy="12" r="2"/></svg></div>
+          <div class="module-card-info">
+            <div class="module-card-name">Bar Module</div>
+            <div class="module-card-desc">Implant-retained bars for overdenture attachment. Hader, Dolder, and custom profiles.</div>
+          </div>
+          <div class="module-card-badge badge-active">Active</div>
+        </div>
+
+        <div class="module-card" style="border-left-color:#a0a0a0">
+          <div class="module-card-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg></div>
+          <div class="module-card-info">
+            <div class="module-card-name">Model Creator</div>
+            <div class="module-card-desc">Digital model design with die ditching, model bases, and gingival masks.</div>
+          </div>
+          <div class="module-card-badge badge-active">Active</div>
+        </div>
+
+        <div class="module-card" style="border-left-color:#86c5da">
+          <div class="module-card-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+          <div class="module-card-info">
+            <div class="module-card-name">Bite Splint</div>
+            <div class="module-card-desc">Michigan-style occlusal splints and deprogrammers for TMD and bruxism treatment.</div>
+          </div>
+          <div class="module-card-badge badge-active">Active</div>
+        </div>
+
+        <div class="module-card" style="border-left-color:#f14c4c">
+          <div class="module-card-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="4" height="8" rx="2"/><rect x="10" y="3" width="4" height="8" rx="2"/><rect x="17" y="3" width="4" height="8" rx="2"/><path d="M1 13q11 8 22 0"/></svg></div>
+          <div class="module-card-info">
+            <div class="module-card-name">Full Denture</div>
+            <div class="module-card-desc">Complete digital denture design including teeth arrangement and base contouring.</div>
+          </div>
+          <div class="module-card-badge badge-active">Active</div>
+        </div>
+
+        <div class="module-card" style="border-left-color:#e8c065">
+          <div class="module-card-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg></div>
+          <div class="module-card-info">
+            <div class="module-card-name">Smile Creator</div>
+            <div class="module-card-desc">Digital smile design with photo overlay and aesthetic analysis tools.</div>
+          </div>
+          <div class="module-card-badge badge-active">Active</div>
+        </div>
+
+        <div class="module-card" style="border-left-color:#c47ecc">
+          <div class="module-card-icon">🔲</div>
+          <div class="module-card-info">
+            <div class="module-card-name">Partial Denture</div>
+            <div class="module-card-desc">Framework design for partial removable dentures with clasp and rest integration.</div>
+          </div>
+          <div class="module-card-badge badge-active">Active</div>
+        </div>
+
+        <div class="module-card" style="border-left-color:#80a0c0">
+          <div class="module-card-icon">🔬</div>
+          <div class="module-card-info">
+            <div class="module-card-name">Surgical Guide</div>
+            <div class="module-card-desc">CBCT-based implant placement guide design with sleeves and fixation pins.</div>
+          </div>
+          <div class="module-card-badge badge-active">Active</div>
+        </div>
+
+        <div class="module-card" style="border-left-color:#888;opacity:.6">
+          <div class="module-card-icon">📐</div>
+          <div class="module-card-info">
+            <div class="module-card-name">Orthodontic</div>
+            <div class="module-card-desc">Aligner design, retainer fabrication, and bracket positioning workflows.</div>
+          </div>
+          <div class="module-card-badge badge-soon">Coming Soon</div>
+        </div>
+
+        <div class="module-card" style="border-left-color:#ce9178">
+          <div class="module-card-icon">🕯</div>
+          <div class="module-card-info">
+            <div class="module-card-name">Wax-up Module</div>
+            <div class="module-card-desc">Digital diagnostic wax-up for pre-treatment planning and mockup fabrication.</div>
+          </div>
+          <div class="module-card-badge badge-active">Active</div>
+        </div>
+
+        <div class="module-card" style="border-left-color:#888;opacity:.6">
+          <div class="module-card-icon">🔍</div>
+          <div class="module-card-info">
+            <div class="module-card-name">Try-In Module</div>
+            <div class="module-card-desc">Virtual try-in and patient communication with realistic rendering.</div>
+          </div>
+          <div class="module-card-badge badge-soon">Coming Soon</div>
+        </div>
+
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" data-close-modal="modules-modal">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Folder Watch Modal -->
+<div id="folder-watch-modal" class="modal-backdrop">
+  <div class="modal" style="width:480px;max-width:95vw">
+    <div class="modal-header">
+      <div class="modal-title">📡 Scanner Folder Watch</div>
+      <button class="modal-close" data-close-modal="folder-watch-modal">✕</button>
+    </div>
+    <div class="modal-body" style="padding:16px 20px">
+      <p style="font-size:12px;color:var(--text-dim);line-height:1.7;margin-bottom:14px">
+        Watches a local folder for new scan files (.STL, .OBJ, .PLY).
+        When a scanner saves a file to that folder, DentalCAD will detect and
+        import it automatically — simulating direct scanner integration.<br>
+        <span style="color:#666;font-size:11px">
+          Requires Chrome / Edge 86+ (File System Access API).
+          Real-time integration requires scanner SDK from the manufacturer.
+        </span>
+      </p>
+      <div id="fw-status" style="padding:8px 12px;background:var(--bg3);border-radius:5px;
+           font-size:12px;color:var(--text-dim);margin-bottom:14px;min-height:32px">
+        Status: Idle — click Start to pick a folder.
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px">
+        <div class="param-label" style="margin:0;width:80px;flex-shrink:0">Poll interval:</div>
+        <select id="fw-poll-interval" class="form-select" style="width:140px;height:28px;font-size:12px">
+          <option value="2000">2 seconds</option>
+          <option value="3000" selected>3 seconds</option>
+          <option value="5000">5 seconds</option>
+          <option value="10000">10 seconds</option>
+        </select>
+      </div>
+      <div id="fw-history" style="max-height:120px;overflow-y:auto;font-size:11px;
+           color:var(--text-dim);border:1px solid var(--border);border-radius:4px;
+           padding:6px 8px;background:var(--bg3);display:none">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button id="btn-fw-start" class="btn btn-primary">▶ Start Watching</button>
+      <button id="btn-fw-stop"  class="btn" disabled>⏹ Stop</button>
+      <button class="btn" data-close-modal="folder-watch-modal">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Nesting Preview Modal -->
+<div id="nesting-modal" class="modal-backdrop">
+  <div class="modal" style="width:620px;max-width:96vw">
+    <div class="modal-header">
+      <div class="modal-title">⬛ Nesting Preview</div>
+      <button class="modal-close" data-close-modal="nesting-modal">✕</button>
+    </div>
+    <div class="modal-body" style="padding:16px 20px">
+      <p style="font-size:12px;color:var(--text-dim);line-height:1.6;margin-bottom:12px">
+        Visualises how restorations fit on a milling blank before export.
+        Actual nesting for CAM requires manufacturer-specific software.
+      </p>
+      <div style="display:flex;gap:12px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+        <div style="display:flex;align-items:center;gap:8px">
+          <label class="form-label" style="margin:0;white-space:nowrap">Blank size:</label>
+          <select id="nesting-blank-size" class="form-select" style="height:28px;font-size:12px;width:200px"></select>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <label class="form-label" style="margin:0">Padding (mm):</label>
+          <input id="nesting-padding" type="number" class="form-input"
+            style="height:26px;font-size:11px;width:60px" min="0.5" max="10" step="0.5" value="2"/>
+        </div>
+        <button id="btn-nesting-add-support" class="btn btn-sm">
+          ⚙ Add Supports
+        </button>
+        <button id="btn-nesting-export-stl" class="btn btn-sm btn-primary">
+          📤 Export STL + Supports
+        </button>
+      </div>
+      <canvas id="nesting-canvas" width="560" height="220"
+        style="width:100%;border:1px solid var(--border);border-radius:6px;
+               background:#111113;display:block"></canvas>
+      <div id="nesting-info" style="margin-top:8px;font-size:11px;color:var(--text-dim)">
+        Load a scan first to preview nesting.
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button id="btn-nesting-refresh" class="btn btn-sm">🔄 Refresh</button>
+      <button class="btn" data-close-modal="nesting-modal">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- About Modal -->
+<div id="about-modal" class="modal-backdrop">
+  <div class="modal" style="width:440px;max-width:95vw">
+    <div class="modal-header">
+      <div class="modal-title">About DentalCAD</div>
+      <button class="modal-close" data-close-modal="about-modal">✕</button>
+    </div>
+    <div class="modal-body" style="text-align:center;padding:36px 28px">
+      <!-- Logo -->
+      <div style="position:relative;width:80px;height:80px;margin:0 auto 20px">
+        <div style="position:absolute;inset:0;border-radius:50%;background:conic-gradient(from 0deg,var(--accent),var(--purple),var(--cyan),var(--accent));animation:spin-ring 4s linear infinite"></div>
+        <div style="position:absolute;inset:4px;border-radius:50%;background:var(--bg-elevated);display:flex;align-items:center;justify-content:center;border:1px solid var(--glass-border)">
+          <svg width="34" height="34" viewBox="0 0 24 24" fill="none">
+            <path d="M12 2C8.13 2 5 5 5 8.5c0 2 .8 3.8 2 5V18a1.5 1.5 0 003 0v-1h4v1a1.5 1.5 0 003 0v-4.5c1.2-1.2 2-3 2-5C19 5 15.87 2 12 2z" fill="url(#ag1)"/>
+            <defs><linearGradient id="ag1" x1="5" y1="2" x2="19" y2="22" gradientUnits="userSpaceOnUse"><stop stop-color="#60a5fa"/><stop offset="1" stop-color="#8b5cf6"/></linearGradient></defs>
+          </svg>
+        </div>
+      </div>
+
+      <h2 style="font-size:26px;font-weight:300;color:#fff;margin-bottom:4px;letter-spacing:-0.3px">
+        Dental<strong style="font-weight:700;color:var(--accent-light)">CAD</strong>
+      </h2>
+      <p style="color:var(--accent-dim);margin-bottom:4px;font-weight:500">Professional Dental Design System</p>
+      <p style="color:var(--text-dim);font-size:12px;margin-bottom:20px;font-family:var(--font-mono)">Web Edition — <span data-app-version>v3.0</span></p>
+
+      <div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--radius-md);padding:14px 18px;margin-bottom:16px;text-align:left">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px">
+          <div style="color:var(--text-dim)">Renderer</div><div style="color:var(--text);font-family:var(--font-mono)">Three.js r128</div>
+          <div style="color:var(--text-dim)">UI Framework</div><div style="color:var(--text);font-family:var(--font-mono)">Vanilla JS</div>
+          <div style="color:var(--text-dim)">Typography</div><div style="color:var(--text);font-family:var(--font-mono)">Inter · JetBrains Mono</div>
+          <div style="color:var(--text-dim)">Formats</div><div style="color:var(--text);font-family:var(--font-mono)">STL · OBJ · PLY · 3MF</div>
+        </div>
+      </div>
+
+      <p style="color:var(--text-dim);font-size:11px;line-height:1.7">
+        Inspired by Exocad DentalCAD™<br>
+        Built entirely in the browser — no installation required.
+      </p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" data-close-modal="about-modal">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Shortcuts Modal -->
+<div id="shortcuts-modal" class="modal-backdrop">
+  <div class="modal" style="width:480px;max-width:95vw">
+    <div class="modal-header">
+      <div class="modal-title">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:8px;vertical-align:middle"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M6 14h12"/></svg>
+        Keyboard Shortcuts
+      </div>
+      <button class="modal-close" data-close-modal="shortcuts-modal">✕</button>
+    </div>
+    <div class="modal-body" style="padding:16px 20px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0">
+
+        <!-- Column 1 -->
+        <div>
+          <div style="font-size:10px;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border)">File & Edit</div>
+          <div style="display:grid;grid-template-columns:110px 1fr;gap:6px 12px;font-size:12px;margin-bottom:16px">
+            <kbd class="kbd">Ctrl+N</kbd><span style="color:var(--text-muted)">New Case</span>
+            <kbd class="kbd">Ctrl+O</kbd><span style="color:var(--text-muted)">Open Case</span>
+            <kbd class="kbd">Ctrl+S</kbd><span style="color:var(--text-muted)">Save Project</span>
+            <kbd class="kbd">Ctrl+E</kbd><span style="color:var(--text-muted)">Export Design</span>
+            <kbd class="kbd">Ctrl+Z</kbd><span style="color:var(--text-muted)">Undo</span>
+            <kbd class="kbd">Ctrl+Y</kbd><span style="color:var(--text-muted)">Redo</span>
+            <kbd class="kbd">Ctrl+M</kbd><span style="color:var(--text-muted)">Open Modules</span>
+          </div>
+
+          <div style="font-size:10px;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border)">Viewport</div>
+          <div style="display:grid;grid-template-columns:110px 1fr;gap:6px 12px;font-size:12px">
+            <kbd class="kbd">G</kbd><span style="color:var(--text-muted)">Toggle Grid</span>
+            <kbd class="kbd">W</kbd><span style="color:var(--text-muted)">Toggle Wireframe</span>
+            <kbd class="kbd">Escape</kbd><span style="color:var(--text-muted)">Close / Deselect</span>
+            <kbd class="kbd">F1</kbd><span style="color:var(--text-muted)">This dialog</span>
+          </div>
+        </div>
+
+        <!-- Column 2 -->
+        <div style="padding-left:20px;border-left:1px solid var(--border)">
+          <div style="font-size:10px;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border)">Tools</div>
+          <div style="display:grid;grid-template-columns:110px 1fr;gap:6px 12px;font-size:12px;margin-bottom:16px">
+            <kbd class="kbd">M</kbd><span style="color:var(--text-muted)">Margin Line tool</span>
+            <kbd class="kbd">D</kbd><span style="color:var(--text-muted)">Measure tool</span>
+            <kbd class="kbd">X</kbd><span style="color:var(--text-muted)">Section Cut tool</span>
+            <kbd class="kbd">Space</kbd><span style="color:var(--text-muted)">Toggle Expert/Wizard</span>
+          </div>
+
+          <div style="font-size:10px;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border)">Wizard Navigation</div>
+          <div style="display:grid;grid-template-columns:110px 1fr;gap:6px 12px;font-size:12px;margin-bottom:16px">
+            <kbd class="kbd">1 – 7</kbd><span style="color:var(--text-muted)">Jump to step 1–7</span>
+          </div>
+
+          <div style="font-size:10px;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border)">Mouse</div>
+          <div style="display:grid;grid-template-columns:110px 1fr;gap:6px 12px;font-size:12px">
+            <kbd class="kbd">LMB drag</kbd><span style="color:var(--text-muted)">Rotate 3D view</span>
+            <kbd class="kbd">RMB drag</kbd><span style="color:var(--text-muted)">Pan 3D view</span>
+            <kbd class="kbd">Scroll</kbd><span style="color:var(--text-muted)">Zoom in / out</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" data-close-modal="shortcuts-modal">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Recent Files Modal -->
+<div id="recent-modal" class="modal-backdrop">
+  <div class="modal" style="width:520px;max-width:95vw">
+    <div class="modal-header">
+      <div class="modal-title">Recent Files</div>
+      <button class="modal-close" data-close-modal="recent-modal">✕</button>
+    </div>
+    <div class="modal-body" style="padding:12px 16px;min-height:120px">
+      <div id="recent-list" style="display:flex;flex-direction:column;gap:6px">
+        <div style="color:#555;font-size:13px;text-align:center;padding:24px 0">
+          No recent files. Save a project to see it here.
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer" style="justify-content:space-between">
+      <button class="btn btn-sm" id="btn-clear-recent" style="color:var(--text-dim)">
+        Clear List
+      </button>
+      <button class="btn" data-close-modal="recent-modal">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- â”€â”€ Scripts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="js/stl-parser.js"></script>
+<script src="js/project-io.js"></script>
+<script src="js/undo-redo.js"></script>
+<script src="js/logger.js"></script>
+<script src="js/analysis.js"></script>
+<script src="js/manufacturing.js"></script>
+<script src="js/tools.js"></script>
+<script src="js/viewport.js"></script>
+<script src="js/dental-chart.js"></script>
+<script src="js/wizard.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
