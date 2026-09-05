@@ -3,7 +3,7 @@
  *
  * Modules:
  *  FolderWatch   — Simulates scanner folder-watch import (File System Access API)
- *                  Watches a local directory; auto-imports new STL/OBJ files.
+ *                  Watches a local directory; auto-imports new STL/OBJ/PLY files.
  *  NestingPreview — Places multiple restorations on a virtual milling blank
  *                   and renders a top-down 2D preview in a canvas.
  *  SupportGenerator — Adds simple vertical support columns under overhanging
@@ -31,7 +31,7 @@ const FolderWatch = (() => {
 
   /**
    * Open a folder-picker dialog and start watching the selected folder.
-   * When a new .stl or .obj file appears, calls onNewFile(File).
+   * When a new .stl, .obj, or .ply file appears, calls onNewFile(File).
    *
    * @param {Function} onNewFile   — callback(File) when a new file is detected
    * @param {Function} onStatus    — callback(string) for status messages
@@ -105,7 +105,7 @@ const FolderWatch = (() => {
 
   function isActive()      { return _active; }
   function getDirName()    { return _dirHandle?.name || '—'; }
-  function setPollMs(ms)   { _pollMs = Math.max(1000, ms); }
+  function setPollMs(ms)   { const value = Number(ms); if (!Number.isFinite(value) || value <= 0) throw new Error('Polling interval must be a positive number'); _pollMs = Math.max(1000, value); }
   function isSupported()   { return !!window.showDirectoryPicker; }
 
   function _isSupported(name) {
