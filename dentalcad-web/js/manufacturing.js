@@ -134,6 +134,46 @@ const NestingPreview = (() => {
   };
 
   /**
+   * Calculate a deterministic top-down layout and report manufacturing
+   * overflow before anything is sent to a CAM process.
+   */
+  function planLayout(geos, blankKey, opts = {}) {
+    const blank = BLANK_SIZES[blankKey] || BLANK_SIZES['98 × 14 mm (Standard)'];
+    const rawPadding = Number(opts.padding ?? 2);
+    const rawMargin = Number(opts.margin ?? 3);
+    if (!Number.isFinite(rawPadding) || rawPadding < 0 || !Number.isFinite(rawMargin) || rawMargin < 0) {
+      throw new Error('Nesting padding and margin must be finite non-negative numbers');
+    }
+    const padding = rawPadding;
+    const margin = rawMargin;
+    const matrices = opts.worldMatrices || [];
+    const boxes = (geos || []).map((geo, i) => _getBBox2D(geo, matrices[i] || opts.worldMatrix || null));
+    let curX = margin, curY = margin, rowH = 0;
+    const placements = [];
+    for (let i = 0; i < boxes.length; i++) {
+      const box = boxes[i];
+      const itemW = box.w + padding;
+      const itemD = box.d + padding;
+      if (curX + itemW > blank.w - margin && curX > margin) {
+        curX = margin; curY += rowH + padding; rowH = 0;
+      }
+      const fits = box.w <= blank.w - 2 * margin && box.d <= blank.h - 2 * margin && curY + itemD <= blank.h - margin;
+      placements.push({ ...box, px: fits ? curX : null, py: fits ? curY : null, idx: i, fits });
+      if (fits) { curX += itemW; rowH = Math.max(rowH, itemD); }
+    }
+    const placed = placements.filter(p => p.fits);
+    const usedArea = placed.reduce((sum, p) => sum + p.w * p.d, 0);
+    return {
+      blank: { ...blank },
+      padding,
+      margin,
+      placements,
+      overflow: placements.filter(p => !p.fits).map(p => p.idx),
+      utilization: blank.w * blank.h ? usedArea / (blank.w * blank.h) : 0,
+    };
+  }
+
+  /**
    * Render a top-down 2D nesting preview of geometries on a blank.
    *
    * @param {HTMLCanvasElement} canvas       — target canvas element
@@ -187,37 +227,8 @@ const NestingPreview = (() => {
       return;
     }
 
-    // Compute 2D bounding boxes for each geo (X-Z plane = top-down)
-    const boxes = geos.map(geo => _getBBox2D(geo));
-
-    // Simple bin-packing: place items left-to-right, wrap to next row
-    let curX = margin;
-    let curY = margin;
-    let rowH = 0;
-    const placed = [];
-
-    for (let i = 0; i < boxes.length; i++) {
-      const { w, d } = boxes[i]; // w = X extent, d = Z extent (depth = Y in top-down)
-      const itemW = w + padding;
-      const itemD = d + padding;
-
-      if (curX + itemW > blank.w - margin && curX > margin) {
-        // Wrap to next row
-        curX  = margin;
-        curY += rowH + padding;
-        rowH  = 0;
-      }
-
-      if (curY + itemD > blank.h - margin) {
-        // No more space — mark remaining as unplaced
-        placed.push({ ...boxes[i], px: null, py: null, idx: i });
-        continue;
-      }
-
-      placed.push({ ...boxes[i], px: curX, py: curY, idx: i });
-      curX += itemW;
-      rowH = Math.max(rowH, itemD);
-    }
+    const plan = planLayout(geos, blankKey, { padding, margin, worldMatrices: opts.worldMatrices, worldMatrix: opts.worldMatrix });
+    const placed = plan.placements;
 
     // Draw placed items
     placed.forEach((item, i) => {
@@ -268,12 +279,14 @@ const NestingPreview = (() => {
   }
 
   /** Get 2D bounding box (X-Z top-down view) */
-  function _getBBox2D(geo) {
+  function _getBBox2D(geo, worldMatrix = null) {
     const pos = geo.getAttribute('position');
     let minX = Infinity, maxX = -Infinity;
     let minZ = Infinity, maxZ = -Infinity;
     for (let i = 0; i < pos.count; i++) {
-      const x = pos.getX(i), z = pos.getZ(i);
+      const point = new THREE.Vector3(pos.getX(i), pos.getY(i), pos.getZ(i));
+      if (worldMatrix) point.applyMatrix4(worldMatrix);
+      const x = point.x, z = point.z;
       if (x < minX) minX = x; if (x > maxX) maxX = x;
       if (z < minZ) minZ = z; if (z > maxZ) maxZ = z;
     }
@@ -294,7 +307,7 @@ const NestingPreview = (() => {
 
   function getBlankSizes() { return Object.keys(BLANK_SIZES); }
 
-  return { render, getBlankSizes, BLANK_SIZES };
+  return { render, planLayout, getBlankSizes, BLANK_SIZES };
 })();
 
 
@@ -341,6 +354,7 @@ const SupportGenerator = (() => {
     // Use a grid to avoid duplicate supports
     const grid     = new Map();
     const supports = [];
+    const supportHeights = [];
 
     // Find bounding box Y min (build plate level)
     let minY = Infinity;
@@ -392,6 +406,7 @@ const SupportGenerator = (() => {
       cyl.attributes.position.needsUpdate = true;
       cyl.computeVertexNormals();
       supports.push(cyl);
+      supportHeights.push(height);
     }
 
     if (!supports.length) {
@@ -399,6 +414,7 @@ const SupportGenerator = (() => {
       const out = geo.clone();
       out.userData.supportsAdded = true;
       out.userData.supportCount  = 0;
+      out.userData.supportStats  = { candidateCells: grid.size, minHeight: 0, maxHeight: 0, buildPlateY };
       return out;
     }
 
@@ -406,6 +422,7 @@ const SupportGenerator = (() => {
     const merged = _mergeGeometries([geo, ...supports]);
     merged.userData.supportsAdded = true;
     merged.userData.supportCount  = supports.length;
+    merged.userData.supportStats  = { candidateCells: grid.size, minHeight: Math.min(...supportHeights), maxHeight: Math.max(...supportHeights), buildPlateY };
     Logger?.info('SupportGen', `Added ${supports.length} support columns`);
     return merged;
   }
@@ -430,7 +447,193 @@ const SupportGenerator = (() => {
   return { generate };
 })();
 
+// ═══════════════════════════════════════════════════════════
+// 4. TOOLPATH PLANNER — conservative 3-axis roughing preview
+// ═══════════════════════════════════════════════════════════
+const ToolpathPlanner = (() => {
+  function _bounds(geometry, worldMatrix = null) {
+    const pos = geometry?.getAttribute?.('position');
+    if (!pos || !pos.count) throw new Error('A mesh geometry is required');
+    if (pos.count % 3 !== 0) throw new Error('Mesh must contain complete triangles');
+    const b = { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity, minZ: Infinity, maxZ: -Infinity };
+    for (let i = 0; i < pos.count; i++) {
+      const point = new THREE.Vector3(pos.getX(i), pos.getY(i), pos.getZ(i));
+      if (worldMatrix) point.applyMatrix4(worldMatrix);
+      const x = point.x, y = point.y, z = point.z;
+      if (![x, y, z].every(Number.isFinite)) throw new Error('Mesh contains non-finite coordinates');
+      b.minX = Math.min(b.minX, x); b.maxX = Math.max(b.maxX, x);
+      b.minY = Math.min(b.minY, y); b.maxY = Math.max(b.maxY, y);
+      b.minZ = Math.min(b.minZ, z); b.maxZ = Math.max(b.maxZ, z);
+    }
+    return b;
+  }
+
+  function plan(geometry, opts = {}) {
+    const bounds = _bounds(geometry, opts.worldMatrix || null);
+    const stepdown = Number(opts.stepdown ?? 0.5);
+    const stepover = Number(opts.stepover ?? 1.0);
+    const margin = Number(opts.margin ?? 0.5);
+    const safeHeight = Number(opts.safeHeight ?? bounds.maxY + 5);
+    const feed = Number(opts.feed ?? 600);
+    const plungeFeed = Number(opts.plungeFeed ?? 120);
+    if (![stepdown, stepover, margin, safeHeight, feed, plungeFeed].every(Number.isFinite) || stepdown <= 0 || stepover <= 0 || margin < 0 || feed <= 0 || plungeFeed <= 0) throw new Error('Invalid toolpath parameters');
+    if (safeHeight <= bounds.maxY) throw new Error('Safe height must be above the mesh');
+    const minX = bounds.minX - margin, maxX = bounds.maxX + margin;
+    const minZ = bounds.minZ - margin, maxZ = bounds.maxZ + margin;
+    const moves = [{ kind: 'rapid', x: minX, y: safeHeight, z: minZ }];
+    let layerCount = 0, rowCount = 0, reverse = false;
+    for (let y = bounds.maxY; y >= bounds.minY - 1e-9; y -= stepdown) {
+      const layerY = Math.max(y, bounds.minY);
+      layerCount++;
+      let row = 0;
+      for (let z = minZ; z <= maxZ + 1e-9; z += stepover) {
+        const rowZ = Math.min(z, maxZ);
+        const fromX = reverse ? maxX : minX;
+        const toX = reverse ? minX : maxX;
+        moves.push({ kind: 'rapid', x: fromX, y: safeHeight, z: rowZ });
+        moves.push({ kind: 'plunge', x: fromX, y: layerY, z: rowZ, feed: plungeFeed });
+        moves.push({ kind: 'cut', x: toX, y: layerY, z: rowZ, feed });
+        reverse = !reverse; row++; rowCount++;
+        if (z + stepover > maxZ && row > 0) break;
+      }
+    }
+    moves.push({ kind: 'rapid', x: minX, y: safeHeight, z: minZ });
+    return Object.freeze({ version: 1, bounds, parameters: { stepdown, stepover, margin, safeHeight, feed, plungeFeed }, moves, layerCount, rowCount });
+  }
+
+  function validate(path) {
+    const errors = [];
+    if (!path || path.version !== 1) errors.push('Unsupported toolpath version');
+    if (!Array.isArray(path?.moves) || path.moves.length < 4) errors.push('Toolpath has too few moves');
+    if (path?.parameters?.safeHeight <= path?.bounds?.maxY) errors.push('Toolpath safe height is unsafe');
+    if (path?.bounds && !['minX','maxX','minY','maxY','minZ','maxZ'].every(k => Number.isFinite(path.bounds[k]))) errors.push('Toolpath bounds are invalid');
+    if (path?.moves?.length && path.moves[0].kind !== 'rapid') errors.push('Toolpath must begin with a rapid move');
+    for (const move of path?.moves || []) {
+      if (!['rapid', 'plunge', 'cut'].includes(move.kind)) errors.push('Unknown toolpath move');
+      if (![move.x, move.y, move.z].every(Number.isFinite)) errors.push('Toolpath contains non-finite coordinates');
+      if ((move.kind === 'plunge' || move.kind === 'cut') && (!Number.isFinite(move.feed) || move.feed <= 0)) errors.push('Cutting move has invalid feed');
+      if (move.kind === 'rapid' && Number.isFinite(path?.parameters?.safeHeight) && move.y < path.parameters.safeHeight) errors.push('Rapid move below safe height');
+      if ((move.kind === 'plunge' || move.kind === 'cut') && path?.bounds && (move.y < path.bounds.minY || move.y > path.bounds.maxY)) errors.push('Cutting move outside mesh bounds');
+      const margin = Number(path?.parameters?.margin);
+      if (path?.bounds && Number.isFinite(margin) && (move.x < path.bounds.minX - margin || move.x > path.bounds.maxX + margin || move.z < path.bounds.minZ - margin || move.z > path.bounds.maxZ + margin)) errors.push('Toolpath move outside XY machining envelope');
+    }
+    return { valid: errors.length === 0, errors };
+  }
+
+  const MACHINE_PROFILES = Object.freeze({
+    generic: { label: 'Generic 3-axis', spindle: 12000, feedScale: 1, lineEnding: '\n' },
+    roland:  { label: 'Roland DG milling', spindle: 10000, feedScale: 0.8, lineEnding: '\r\n' },
+    vhf:     { label: 'vhf dental milling', spindle: 15000, feedScale: 1.1, lineEnding: '\r\n' },
+  });
+
+  function toGCode(path, opts = {}) {
+    const check = validate(path);
+    if (!check.valid) throw new Error(check.errors.join('; '));
+    const machine = String(opts.machine || 'generic').toLowerCase();
+    const profile = MACHINE_PROFILES[machine];
+    if (!profile) throw new Error(`Unknown machine profile: ${machine}`);
+    const lines = [
+      `; DentalCAD conservative roughing toolpath v${path.version}`,
+      `; Machine: ${profile.label}`,
+      `; Layers: ${path.layerCount}  Rows: ${path.rowCount}`,
+      `; WARNING: Review and post-process for the target machine before use`,
+      'G21', 'G90', 'G17', `M3 S${profile.spindle}`,
+    ];
+    for (const m of path.moves) {
+      const code = m.kind === 'rapid' ? 'G0' : 'G1';
+      const feed = m.feed ? ` F${(m.feed * profile.feedScale).toFixed(1)}` : '';
+      lines.push(`${code} X${m.x.toFixed(4)} Y${m.y.toFixed(4)} Z${m.z.toFixed(4)}${feed}`);
+    }
+    lines.push('M5', 'M30');
+    return lines.join(profile.lineEnding);
+  }
+
+  function validateGCode(text, machine = 'generic') {
+    const errors = [];
+    const profile = MACHINE_PROFILES[String(machine).toLowerCase()];
+    if (!profile) errors.push(`Unknown machine profile: ${machine}`);
+    if (typeof text !== 'string' || !text.trim()) errors.push('G-code is empty');
+    else {
+      if (!text.includes('G21')) errors.push('Missing metric units command');
+      if (!text.includes('G90')) errors.push('Missing absolute positioning command');
+      if (!text.includes('M30')) errors.push('Missing program end command');
+      if (!/\bM5(?:\s|$)/m.test(text)) errors.push('Missing spindle stop command');
+      if (/NaN|Infinity|undefined/.test(text)) errors.push('G-code contains invalid numeric values');
+      for (const line of text.split(/\r?\n/)) {
+        const motion = line.trim().match(/^G[01]\s+(.+)$/i);
+        if (!motion) continue;
+        for (const token of motion[1].trim().split(/\s+/)) {
+          if (!/^[XYZFS][+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?$/i.test(token)) errors.push(`Invalid G-code coordinate token: ${token}`);
+        }
+      }
+      if (profile && !text.includes(`Machine: ${profile.label}`)) errors.push('Machine profile header mismatch');
+    }
+    return { valid: errors.length === 0, errors };
+  }
+
+  return { plan, validate, toGCode, validateGCode, MACHINE_PROFILES };
+})();
+
+// ═══════════════════════════════════════════════════════════
+// 5. MANUFACTURING JOB — auditable CAM handoff metadata
+// ═══════════════════════════════════════════════════════════
+const ManufacturingJob = (() => {
+  function create({ geometry, caseId = 'Case', blankKey = '98 × 14 mm (Standard)', padding = 2, supportsAdded = false, supportCount = 0, toolpath = null, machine = 'generic', worldMatrix = null } = {}) {
+    if (!geometry?.getAttribute) throw new Error('A mesh geometry is required');
+    const pos = geometry.getAttribute('position');
+    if (!pos || !pos.count || pos.count % 3 !== 0) throw new Error('Mesh must contain complete triangles');
+    for (let i = 0; i < pos.array.length; i++) if (!Number.isFinite(pos.array[i])) throw new Error('Mesh contains non-finite coordinates');
+    const layout = NestingPreview.planLayout([geometry], blankKey, { padding, worldMatrices: worldMatrix ? [worldMatrix] : [] });
+    const overflow = layout.overflow.length > 0;
+    let toolpathSummary = null;
+    if (toolpath) {
+      const check = ToolpathPlanner.validate(toolpath);
+      if (!check.valid) throw new Error(check.errors.join('; '));
+      if (!ToolpathPlanner.MACHINE_PROFILES[machine]) throw new Error(`Unknown machine profile: ${machine}`);
+      toolpathSummary = { version: toolpath.version, machine, layerCount: toolpath.layerCount, rowCount: toolpath.rowCount, moveCount: toolpath.moves.length };
+    }
+    const job = {
+      version: 1,
+      caseId: String(caseId || 'Case'),
+      createdAt: new Date().toISOString(),
+      blankKey,
+      blank: layout.blank,
+      padding: layout.padding,
+      triangleCount: pos.count / 3,
+      supportsAdded: !!supportsAdded,
+      supportCount: Math.max(0, Number(supportCount) || 0),
+      supportStats: geometry.userData?.supportStats || null,
+      utilization: layout.utilization,
+      overflow,
+      toolpath: toolpathSummary,
+      status: overflow ? 'blocked' : 'ready',
+    };
+    return Object.freeze(job);
+  }
+
+  function validate(job) {
+    const errors = [];
+    if (!job || job.version !== 1) errors.push('Unsupported manufacturing job version');
+    if (!job?.caseId) errors.push('Missing case ID');
+    if (!Number.isFinite(job?.triangleCount) || job.triangleCount < 1) errors.push('Invalid triangle count');
+    if (job?.overflow) errors.push('Nesting overflow must be resolved');
+    if (!job?.blank || !(job.blank.w > 0 && job.blank.h > 0)) errors.push('Invalid blank dimensions');
+    if (job?.toolpath && (!job.toolpath.machine || !Number.isFinite(job.toolpath.layerCount) || !Number.isFinite(job.toolpath.rowCount) || !Number.isFinite(job.toolpath.moveCount) || job.toolpath.moveCount < 1)) errors.push('Invalid toolpath summary');
+    return { valid: errors.length === 0, errors };
+  }
+
+  function toJSON(job) {
+    const check = validate(job);
+    if (!check.valid) throw new Error(check.errors.join('; '));
+    return JSON.stringify(job, null, 2);
+  }
+
+  return { create, validate, toJSON };
+})();
+
 // Global exports
 window.FolderWatch        = FolderWatch;
 window.NestingPreview     = NestingPreview;
 window.SupportGenerator   = SupportGenerator;
+window.ToolpathPlanner    = ToolpathPlanner;
+window.ManufacturingJob   = ManufacturingJob;

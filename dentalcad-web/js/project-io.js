@@ -82,6 +82,9 @@ const ProjectIO = (() => {
       stats:     geometry.userData.stats || {},
       importOffset:    geometry.userData.importOffset    || null,
       importViewScale: geometry.userData.importViewScale || null,
+      supportsAdded:   geometry.userData.supportsAdded ?? false,
+      supportCount:    geometry.userData.supportCount ?? 0,
+      supportStats:    geometry.userData.supportStats || null,
     };
   }
 
@@ -93,6 +96,7 @@ const ProjectIO = (() => {
     if (snap.normals?.length && (!Array.isArray(snap.normals) || !snap.normals.every(Number.isFinite))) {
       throw new Error('Invalid mesh normals in project file');
     }
+    if (!_validateSupportMetadata(snap)) throw new Error('Invalid support metadata in project file');
     const posArr = new Float32Array(snap.positions);
     const geo    = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(posArr, 3));
@@ -104,11 +108,32 @@ const ProjectIO = (() => {
     geo.userData.stats           = snap.stats           || {};
     geo.userData.importOffset    = snap.importOffset    || { x:0, y:0, z:0 };
     geo.userData.importViewScale = snap.importViewScale || 1;
+    if (snap.supportsAdded != null) geo.userData.supportsAdded = !!snap.supportsAdded;
+    if (snap.supportCount != null) geo.userData.supportCount = Number(snap.supportCount) || 0;
+    if (snap.supportStats) geo.userData.supportStats = snap.supportStats;
     return geo;
+  }
+
+  function _validateImplantPlan(plan) {
+    if (plan == null) return true;
+    if (!Array.isArray(plan.implants) || !Array.isArray(plan.sleeves) || !Array.isArray(plan.fixationPins)) return false;
+    return plan.implants.every((implant) => {
+      if (!implant || typeof implant !== 'object' || typeof implant.system !== 'string') return false;
+      if (![implant.diameter, implant.length].every(Number.isFinite)) return false;
+      const p = implant.position || {}, r = implant.rotation || {};
+      return ['x', 'y', 'z'].every(a => Number.isFinite(p[a]) && Number.isFinite(r[a]));
+    });
+  }
+
+  function _validateSupportMetadata(snap) {
+    if (!snap || snap.supportStats == null) return true;
+    const s = snap.supportStats;
+    return !!s && Number.isFinite(Number(s.candidateCells)) && Number.isFinite(Number(s.minHeight)) && Number.isFinite(Number(s.maxHeight)) && Number.isFinite(Number(s.buildPlateY)) && Number(s.candidateCells) >= 0 && Number(s.minHeight) >= 0 && Number(s.maxHeight) >= Number(s.minHeight);
   }
 
   // ── Build project object ──────────────────────────────────
   function _buildProject(caseData, geometry, extraData = {}) {
+    if (!_validateImplantPlan(extraData.implantPlan)) throw new Error('Invalid implant plan');
     return {
       version:      FORMAT_VERSION,
       appVersion:   APP_VERSION,
@@ -116,6 +141,7 @@ const ProjectIO = (() => {
       caseData:     { ...caseData },
       meshSnapshot: _serializeMesh(geometry),
       marginLine:   extraData.marginLine || null,
+      implantPlan:  extraData.implantPlan || null,
     };
   }
 
@@ -139,6 +165,10 @@ const ProjectIO = (() => {
     }
     const marginLine     = rawMargin?.length ? rawMargin : null;
     const marginLineClosed = project.marginLine?.closed ?? false;
+    const implantPlan = project.implantPlan ?? null;
+    if (!_validateImplantPlan(implantPlan)) {
+      throw new Error('Invalid implant plan in project file');
+    }
     markClean();
     return {
       caseData: project.caseData,
@@ -146,6 +176,7 @@ const ProjectIO = (() => {
       stats,
       marginLine,
       marginLineClosed,
+      implantPlan,
       savedAt:   project.savedAt || null,
       wizardStep: project.caseData.wizardStep ?? 0,
     };
@@ -306,50 +337,61 @@ const ProjectIO = (() => {
   }
 
   // ── Export mesh (unchanged API) ───────────────────────────
+  function prepareExportGeometry(geometry, worldMatrix = null) {
+    if (!geometry) throw new Error('Missing geometry');
+    return worldMatrix ? geometry.clone().applyMatrix4(worldMatrix) : geometry;
+  }
+
   function exportMesh(geometry, format, caseId, opts = {}) {
     const safeId = (caseId || 'Case').replace(/[^a-z0-9_\-]/gi, '_');
     const scale  = opts.units === 'in' ? 1 / 25.4 : 1.0;
+    // Export the positioned mesh, not only its local geometry. The viewport
+    // keeps design transforms on the mesh so they must be baked into the
+    // export copy while preserving the original geometry and import metadata.
+    const exportGeometry = prepareExportGeometry(geometry, opts.worldMatrix);
     let blob, filename, blob2, filename2;
 
     switch (format) {
       case 'STL Binary': {
-        const buf = STLParser.exportBinarySTL(geometry, scale);
+        const buf = STLParser.exportBinarySTL(exportGeometry, scale);
         blob = new Blob([buf], { type: 'application/octet-stream' });
         filename = `DentalCAD_${safeId}.stl`;
         break;
       }
       case 'STL ASCII': {
-        const txt = STLParser.exportASCIISTL(geometry, scale);
+        const txt = STLParser.exportASCIISTL(exportGeometry, scale);
         blob = new Blob([txt], { type: 'text/plain' });
         filename = `DentalCAD_${safeId}_ascii.stl`;
         break;
       }
       case 'OBJ': {
         const base = `DentalCAD_${safeId}`;
-        blob  = new Blob([STLParser.exportOBJ(geometry, scale, base)], { type: 'text/plain' });
+        blob  = new Blob([STLParser.exportOBJ(exportGeometry, scale, base, {
+          marginLinePoints: opts.includeMarginLine ? opts.marginLinePoints : [],
+        })], { type: 'text/plain' });
         blob2 = new Blob([STLParser.exportMTL('default')],              { type: 'text/plain' });
         filename  = `${base}.obj`;
         filename2 = `${base}.mtl`;
         break;
       }
       case 'PLY Binary': {
-        const buf = STLParser.exportBinaryPLY(geometry, scale);
+        const buf = STLParser.exportBinaryPLY(exportGeometry, scale);
         blob = new Blob([buf], { type: 'application/octet-stream' });
         filename = `DentalCAD_${safeId}.ply`;
         break;
       }
       case 'PLY ASCII': {
-        blob = new Blob([STLParser.exportASCIIPLY(geometry, scale)], { type: 'text/plain' });
+        blob = new Blob([STLParser.exportASCIIPLY(exportGeometry, scale)], { type: 'text/plain' });
         filename = `DentalCAD_${safeId}_ascii.ply`;
         break;
       }
       case '3MF': {
-        blob = new Blob([STLParser.export3MFModel(geometry, scale)], { type: 'application/xml' });
+        blob = new Blob([STLParser.export3MFPackage(exportGeometry, scale)], { type: 'application/vnd.ms-package.3dmanufacturing-3dmodel' });
         filename = `DentalCAD_${safeId}.3mf`;
         break;
       }
       default: {
-        const buf = STLParser.exportBinarySTL(geometry, scale);
+        const buf = STLParser.exportBinarySTL(exportGeometry, scale);
         blob = new Blob([buf], { type: 'application/octet-stream' });
         filename = `DentalCAD_${safeId}.stl`;
       }
@@ -357,6 +399,25 @@ const ProjectIO = (() => {
 
     _triggerDownload(blob, filename);
     if (blob2 && filename2) setTimeout(() => _triggerDownload(blob2, filename2), 400);
+    return filename;
+  }
+
+  function exportManufacturingJob(job, caseId) {
+    if (typeof ManufacturingJob === 'undefined') throw new Error('Manufacturing job module not loaded');
+    const safeId = (caseId || job?.caseId || 'Case').replace(/[^a-z0-9_\-]/gi, '_');
+    const filename = `DentalCAD_${safeId}_manufacturing-job.json`;
+    _triggerDownload(new Blob([ManufacturingJob.toJSON(job)], { type: 'application/json' }), filename);
+    return filename;
+  }
+
+  function exportToolpath(path, caseId, machine = 'generic') {
+    if (typeof ToolpathPlanner === 'undefined') throw new Error('Toolpath planner module not loaded');
+    const safeId = (caseId || 'Case').replace(/[^a-z0-9_\-]/gi, '_');
+    const filename = `DentalCAD_${safeId}_roughing.nc`;
+    const code = ToolpathPlanner.toGCode(path, { machine });
+    const check = ToolpathPlanner.validateGCode(code, machine);
+    if (!check.valid) throw new Error(check.errors.join('; '));
+    _triggerDownload(new Blob([code], { type: 'text/plain' }), filename);
     return filename;
   }
 
@@ -376,6 +437,9 @@ const ProjectIO = (() => {
     autoSave, loadAutoSave, clearAutoSave, hasAutoSave,
     getRecentFiles, clearRecentFiles,
     exportMesh,
+    exportManufacturingJob,
+    exportToolpath,
+    prepareExportGeometry,
     markDirty, markClean, isDirty, onDirtyChange, getLastSaved,
   };
 })();

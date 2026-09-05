@@ -9,6 +9,27 @@
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 /* ============================================================
    DentalCAD Web — Complete UI Redesign v2.0
    Modern Dark Theme · Glassmorphism · Fluid Animations
@@ -2664,10 +2685,7 @@ html, body {
 }
 .lib-thumb:hover .lib-thumb-name { color: var(--text-muted); }
 .lib-thumb.selected .lib-thumb-name { color: var(--accent-light); font-weight: 600; }
-
-
-
-
+/* End of DentalCAD stylesheet */
 
 </style>
 </head>
@@ -3068,7 +3086,7 @@ html, body {
             <div id="drop-zone">
               <div class="drop-icon">📂</div>
               <div class="drop-title">Drop scan file here</div>
-              <div class="drop-sub">Supported: .stl &nbsp; .obj &nbsp; .ply (ASCII)</div>
+              <div class="drop-sub">Supported: .stl &nbsp; .obj &nbsp; .ply (ASCII + Binary)</div>
             </div>
             <input id="scan-file-input" type="file" accept=".stl,.obj,.ply" style="display:none" />
 
@@ -3523,6 +3541,30 @@ html, body {
                   </div>
                 </div>
 
+                <!-- ── Implant Planning ── -->
+                <div id="implant-planning-ui" class="hidden"
+                     style="margin-top:14px;border-top:1px solid var(--border);padding-top:10px">
+                  <div class="param-label" style="color:var(--accent-dim)">🦷 Implant Planning</div>
+                  <div class="param-label">System</div>
+                  <select id="implant-system" class="form-select" style="width:100%;height:26px;font-size:11px">
+                    <option value="generic">Generic</option>
+                    <option value="straumann">Straumann</option>
+                    <option value="nobel">Nobel Biocare</option>
+                  </select>
+                  <div style="display:flex;gap:5px;margin-top:6px">
+                    <div style="flex:1"><div class="param-label">Diameter (mm)</div>
+                      <input id="implant-diameter" type="number" class="form-input" value="4.2" min="2.5" max="8" step="0.1" style="height:26px;font-size:11px"/></div>
+                    <div style="flex:1"><div class="param-label">Length (mm)</div>
+                      <input id="implant-length" type="number" class="form-input" value="10" min="5" max="25" step="0.5" style="height:26px;font-size:11px"/></div>
+                  </div>
+                  <div style="display:flex;gap:4px;margin-top:7px">
+                    <button id="btn-add-implant" class="btn btn-sm" style="flex:1">＋ Add Fixture</button>
+                    <button id="btn-build-guide" class="btn btn-sm" style="flex:1">⊙ Build Guide</button>
+                  </div>
+                  <button id="btn-clear-implant-plan" class="btn btn-sm btn-danger" style="width:100%;margin-top:4px">Clear Implant Plan</button>
+                  <div id="implant-plan-status" style="font-size:10px;color:var(--text-dim);margin-top:5px;min-height:14px;font-family:var(--font-mono)"></div>
+                </div>
+
                 <!-- ── Occlusion Heatmap ── -->
                 <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:10px">
                   <div class="param-label" style="color:var(--accent-dim)">🦷 Occlusion Heatmap</div>
@@ -3942,7 +3984,7 @@ html, body {
                     <option value="OBJ">OBJ + MTL  — with normals &amp; material</option>
                     <option value="PLY Binary">PLY Binary  — with normals</option>
                     <option value="PLY ASCII">PLY ASCII  — human-readable</option>
-                    <option value="3MF">3MF (XML)  — 3D Manufacturing Format</option>
+                    <option value="3MF">3MF Package — 3D Manufacturing Format</option>
                   </select>
                   <div id="export-size-preview"
                        style="font-size:11px;color:var(--text-dim);padding-left:2px">
@@ -4389,8 +4431,8 @@ html, body {
     </div>
     <div class="modal-body" style="padding:16px 20px">
       <p style="font-size:12px;color:var(--text-dim);line-height:1.6;margin-bottom:12px">
-        Visualises how restorations fit on a milling blank before export.
-        Actual nesting for CAM requires manufacturer-specific software.
+        Validates fit on the selected blank and can generate a conservative
+        3-axis roughing toolpath for review before machine-specific post-processing.
       </p>
       <div style="display:flex;gap:12px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
         <div style="display:flex;align-items:center;gap:8px">
@@ -4408,6 +4450,14 @@ html, body {
         <button id="btn-nesting-export-stl" class="btn btn-sm btn-primary">
           📤 Export STL + Supports
         </button>
+        <button id="btn-nesting-export-gcode" class="btn btn-sm" style="border-color:rgba(78,201,176,.4);color:var(--green)">
+          ⚙ Export Toolpath (G-code)
+        </button>
+        <select id="toolpath-machine" class="form-select" style="height:28px;font-size:11px;width:155px" title="G-code machine profile">
+          <option value="generic">Generic 3-axis</option>
+          <option value="roland">Roland DG</option>
+          <option value="vhf">vhf dental</option>
+        </select>
       </div>
       <canvas id="nesting-canvas" width="560" height="220"
         style="width:100%;border:1px solid var(--border);border-radius:6px;
@@ -4674,21 +4724,28 @@ const STLParser = (() => {
       const line = rawLine.trim();
       if (line.startsWith('v ')) {
         const p = line.split(/\s+/);
-        rawVerts.push([parseFloat(p[1]), parseFloat(p[2]), parseFloat(p[3])]);
+        const v = [parseFloat(p[1]), parseFloat(p[2]), parseFloat(p[3])];
+        if (v.length !== 3 || !v.every(Number.isFinite)) throw new Error('Invalid OBJ vertex');
+        rawVerts.push(v);
       } else if (line.startsWith('vn ')) {
         const p = line.split(/\s+/);
-        rawNormals.push([parseFloat(p[1]), parseFloat(p[2]), parseFloat(p[3])]);
+        const n = [parseFloat(p[1]), parseFloat(p[2]), parseFloat(p[3])];
+        if (n.length !== 3 || !n.every(Number.isFinite)) throw new Error('Invalid OBJ normal');
+        rawNormals.push(n);
       } else if (line.startsWith('f ')) {
         const parts = line.split(/\s+/).slice(1);
+        if (parts.length < 3) throw new Error('Invalid OBJ face');
         // Fan-triangulate polygons (>3 verts)
         for (let i = 1; i < parts.length - 1; i++) {
           for (const token of [parts[0], parts[i], parts[i + 1]]) {
             const idx = token.split('/');
             const rawVi = parseInt(idx[0], 10);
             const vi = rawVi < 0 ? rawVerts.length + rawVi : rawVi - 1;
+            if (!Number.isInteger(rawVi) || !rawVerts[vi]) throw new Error('OBJ face references missing vertex');
             const rawVni = idx[2] ? parseInt(idx[2], 10) : 0;
             const vni = rawVni < 0 ? rawNormals.length + rawVni : rawVni - 1;
-            const v   = rawVerts[vi] || [0, 0, 0];
+            if (idx[2] && (!Number.isInteger(rawVni) || !rawNormals[vni])) throw new Error('OBJ face references missing normal');
+            const v   = rawVerts[vi];
             positions.push(v[0], v[1], v[2]);
             const n = vni >= 0 ? rawNormals[vni] : null;
             normals.push(n ? n[0] : 0, n ? n[1] : 1, n ? n[2] : 0);
@@ -4741,6 +4798,84 @@ const STLParser = (() => {
           normals.push(0, 1, 0);
         }
       }
+    }
+    return { positions: new Float32Array(positions), normals: new Float32Array(normals), triCount: positions.length / 9 };
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // PARSE — binary PLY (little/big endian, scalar vertex props)
+  // ═══════════════════════════════════════════════════════════
+  function _parseBinaryPLY(buffer) {
+    const bytes = new Uint8Array(buffer);
+    const marker = new TextEncoder().encode('end_header');
+    let markerAt = -1;
+    for (let i = 0; i <= bytes.length - marker.length; i++) {
+      let match = true;
+      for (let j = 0; j < marker.length; j++) if (bytes[i + j] !== marker[j]) { match = false; break; }
+      if (match) { markerAt = i; break; }
+    }
+    if (markerAt < 0) throw new Error('Invalid binary PLY header');
+    let dataStart = markerAt + marker.length;
+    while (dataStart < bytes.length && (bytes[dataStart] === 10 || bytes[dataStart] === 13 || bytes[dataStart] === 32 || bytes[dataStart] === 9)) dataStart++;
+    const header = new TextDecoder().decode(bytes.slice(0, markerAt)).replace(/\r/g, '').split('\n').map(s => s.trim()).filter(Boolean);
+    if (header[0]?.toLowerCase() !== 'ply') throw new Error('Invalid PLY header');
+    const format = header.find(line => line.startsWith('format '));
+    const little = format?.includes('binary_little_endian');
+    const big = format?.includes('binary_big_endian');
+    if (!little && !big) throw new Error('Unsupported binary PLY format');
+    const sizes = { char:1, int8:1, uchar:1, uint8:1, short:2, int16:2, ushort:2, uint16:2, int:4, int32:4, uint:4, uint32:4, float:4, float32:4, double:8, float64:8 };
+    const readValue = (view, offset, type) => {
+      const t = type.toLowerCase(), le = little;
+      if (!(t in sizes)) throw new Error(`Unsupported PLY property type: ${type}`);
+      if (t === 'char' || t === 'int8') return view.getInt8(offset);
+      if (t === 'uchar' || t === 'uint8') return view.getUint8(offset);
+      if (t === 'short' || t === 'int16') return view.getInt16(offset, le);
+      if (t === 'ushort' || t === 'uint16') return view.getUint16(offset, le);
+      if (t === 'int' || t === 'int32') return view.getInt32(offset, le);
+      if (t === 'uint' || t === 'uint32') return view.getUint32(offset, le);
+      if (t === 'float' || t === 'float32') return view.getFloat32(offset, le);
+      return view.getFloat64(offset, le);
+    };
+    const elements = [];
+    let current = null;
+    for (const line of header.slice(1)) {
+      const p = line.split(/\s+/);
+      if (p[0] === 'element') { current = { name: p[1], count: Number(p[2]), props: [] }; if (!Number.isInteger(current.count) || current.count < 0) throw new Error('Invalid PLY element count'); elements.push(current); }
+      else if (p[0] === 'property' && current) {
+        if (p[1] === 'list') current.props.push({ list: true, countType: p[2], itemType: p[3], name: p[4] });
+        else current.props.push({ list: false, type: p[1], name: p[2] });
+      }
+    }
+    const vertexEl = elements.find(e => e.name === 'vertex'), faceEl = elements.find(e => e.name === 'face');
+    if (!vertexEl || !vertexEl.count || !faceEl) throw new Error('Binary PLY requires vertex and face elements');
+    const view = new DataView(buffer), positions = [], normals = [], verts = [], vertexStride = vertexEl.props.reduce((n, p) => n + (p.list ? 0 : sizes[p.type.toLowerCase()] || 0), 0);
+    if (!vertexStride) throw new Error('Invalid binary PLY vertex properties');
+    let off = dataStart;
+    for (let i = 0; i < vertexEl.count; i++) {
+      const v = {}; for (const p of vertexEl.props) { if (p.list) throw new Error('List vertex properties are unsupported'); if (off + sizes[p.type.toLowerCase()] > buffer.byteLength) throw new Error('Truncated binary PLY vertex data'); v[p.name] = readValue(view, off, p.type); off += sizes[p.type.toLowerCase()]; }
+      if (![v.x, v.y, v.z].every(Number.isFinite)) throw new Error('Invalid binary PLY vertex');
+      verts.push(v);
+    }
+    const faceProp = faceEl.props.find(p => p.list);
+    if (!faceProp) throw new Error('Binary PLY face list is missing');
+    for (let i = 0; i < faceEl.count; i++) {
+      let ids = null;
+      for (const p of faceEl.props) {
+        if (p.list) {
+          if (off + sizes[p.countType.toLowerCase()] > buffer.byteLength) throw new Error('Truncated binary PLY face data');
+          const n = readValue(view, off, p.countType); off += sizes[p.countType.toLowerCase()];
+          if (!Number.isInteger(n) || n < 0) throw new Error('Invalid binary PLY face list');
+          const values = [];
+          for (let j = 0; j < n; j++) { if (off + sizes[p.itemType.toLowerCase()] > buffer.byteLength) throw new Error('Truncated binary PLY face data'); const value = readValue(view, off, p.itemType); off += sizes[p.itemType.toLowerCase()]; values.push(value); }
+          if (p === faceProp) ids = values;
+        } else {
+          if (!(p.type.toLowerCase() in sizes) || off + sizes[p.type.toLowerCase()] > buffer.byteLength) throw new Error('Truncated binary PLY face data');
+          off += sizes[p.type.toLowerCase()];
+        }
+      }
+      if (!ids || ids.length < 3) throw new Error('Invalid binary PLY face');
+      for (const id of ids) if (!Number.isInteger(id) || !verts[id]) throw new Error('PLY face references missing vertex');
+      for (let j = 1; j < ids.length - 1; j++) for (const id of [ids[0], ids[j], ids[j + 1]]) { const v = verts[id]; positions.push(v.x, v.y, v.z); normals.push(v.nx ?? 0, v.ny ?? 0, v.nz ?? 0); }
     }
     return { positions: new Float32Array(positions), normals: new Float32Array(normals), triCount: positions.length / 9 };
   }
@@ -4831,14 +4966,15 @@ const STLParser = (() => {
           if (name.endsWith('.obj')) {
             parsed = _parseOBJ(new TextDecoder().decode(buffer));
           } else if (name.endsWith('.ply')) {
-            parsed = _parseASCIIPLY(new TextDecoder().decode(buffer));
+            const header = new TextDecoder().decode(buffer.slice(0, Math.min(buffer.byteLength, 4096))).toLowerCase();
+            parsed = header.includes('format binary_little_endian') || header.includes('format binary_big_endian') ? _parseBinaryPLY(buffer) : _parseASCIIPLY(new TextDecoder().decode(buffer));
           } else if (name.endsWith('.stl') && _isBinarySTL(buffer)) {
             parsed = _parseBinarySTL(buffer);
           } else if (name.endsWith('.stl')) {
             // ASCII STL (also catches binary files that start with "solid")
             parsed = _parseASCIISTL(new TextDecoder().decode(buffer));
           } else {
-            reject(new Error('Unsupported scan format. Use STL, OBJ, or ASCII PLY.'));
+            reject(new Error('Unsupported scan format. Use STL, OBJ, or PLY.'));
             return;
           }
 
@@ -4871,7 +5007,11 @@ const STLParser = (() => {
    * @returns {{ pos: Float32Array, nor: Float32Array, triCount: number }}
    */
   function _getExportBuffers(geo, outputScale = 1.0) {
+    if (!geo?.getAttribute) throw new Error('A mesh geometry is required for export');
+    if (!Number.isFinite(outputScale) || outputScale <= 0) throw new Error('Export scale must be positive');
     const posAttr  = geo.getAttribute('position');
+    if (!posAttr?.count || posAttr.count % 3 !== 0) throw new Error('Mesh must contain complete triangles for export');
+    for (let i = 0; i < posAttr.array.length; i++) if (!Number.isFinite(posAttr.array[i])) throw new Error('Mesh contains non-finite coordinates');
     const normAttr = geo.getAttribute('normal');
     const vCount   = posAttr.count;
     const triCount = Math.floor(vCount / 3);
@@ -4997,7 +5137,7 @@ const STLParser = (() => {
   // ═══════════════════════════════════════════════════════════
   // EXPORT — OBJ  (with normals, groups, mtl reference)
   // ═══════════════════════════════════════════════════════════
-  function exportOBJ(geo, outputScale = 1.0, mtlName = null) {
+  function exportOBJ(geo, outputScale = 1.0, mtlName = null, options = {}) {
     const { pos, nor, triCount } = _getExportBuffers(geo, outputScale);
     const vCount = triCount * 3;
     const lines  = [];
@@ -5027,6 +5167,30 @@ const STLParser = (() => {
     for (let i = 0; i < triCount; i++) {
       const a = i*3 + 1;
       lines.push(`f ${a}//${a} ${a+1}//${a+1} ${a+2}//${a+2}`);
+    }
+
+    // Optional margin annotation as a separate OBJ line object. Margin points
+    // are stored in viewport coordinates, so use the same inverse import
+    // transform as the mesh export.
+    const margin = Array.isArray(options.marginLinePoints) ? options.marginLinePoints : [];
+    if (margin.length >= 2) {
+      const viewScale = geo.userData.importViewScale || 1;
+      const off = geo.userData.importOffset || { x: 0, y: 0, z: 0 };
+      const start = vCount + 1;
+      lines.push(`g Margin_Line`);
+      for (const p of margin) {
+        const x = (Number(p.x) / viewScale + off.x) * outputScale;
+        const y = (Number(p.y) / viewScale + off.y) * outputScale;
+        const z = (Number(p.z) / viewScale + off.z) * outputScale;
+        if ([x, y, z].every(Number.isFinite)) lines.push(`v ${x.toFixed(6)} ${y.toFixed(6)} ${z.toFixed(6)}`);
+      }
+      const end = lines.length;
+      const added = end - (lines.findIndex(l => l === `g Margin_Line`) + 1);
+      if (added >= 2) {
+        const first = start;
+        const last = start + added - 1;
+        lines.push(`l ${first} ${last}`);
+      }
     }
 
     return lines.join('\n');
@@ -5146,11 +5310,7 @@ const STLParser = (() => {
   }
 
   // ═══════════════════════════════════════════════════════════
-  // EXPORT — 3MF  (Open Packaging Convention XML subset)
-  // A real 3MF file is a ZIP with a .model XML inside.
-  // Since JS can't easily write ZIP without a library, we write
-  // a valid .model XML that many slicers accept directly.
-  // Full .3mf requires JSZip; we offer both options.
+  // EXPORT — 3MF package (ZIP store, no external dependency)
   // ═══════════════════════════════════════════════════════════
   function export3MFModel(geo, outputScale = 1.0) {
     const { pos, nor, triCount } = _getExportBuffers(geo, outputScale);
@@ -5188,6 +5348,39 @@ const STLParser = (() => {
       `  </build>`,
       `</model>`,
     ].join('\n');
+  }
+
+  function _crc32(bytes) {
+    let crc = 0xffffffff;
+    for (const byte of bytes) {
+      crc ^= byte;
+      for (let i = 0; i < 8; i++) crc = (crc >>> 1) ^ (0xedb88320 & -(crc & 1));
+    }
+    return (crc ^ 0xffffffff) >>> 0;
+  }
+
+  function export3MFPackage(geo, outputScale = 1.0) {
+    const files = [
+      ['[Content_Types].xml', '<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="model" ContentType="application/vnd.ms-package.3dmanufacturing-3dmodel+xml"/></Types>'],
+      ['_rels/.rels', '<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Target="/3D/3dmodel.model" Id="rel0" Type="http://schemas.microsoft.com/3d/2013/01/3dmodel"/></Relationships>'],
+      ['3D/3dmodel.model', export3MFModel(geo, outputScale)],
+    ].map(([name, text]) => ({ nameBytes: new TextEncoder().encode(name), data: new TextEncoder().encode(text) }));
+    const local = [], central = [];
+    let offset = 0;
+    const u16 = (v) => { const a = new Uint8Array(2); new DataView(a.buffer).setUint16(0, v, true); return a; };
+    const u32 = (v) => { const a = new Uint8Array(4); new DataView(a.buffer).setUint32(0, v >>> 0, true); return a; };
+    const join = (parts) => { const size = parts.reduce((n, p) => n + p.length, 0), out = new Uint8Array(size); let at = 0; for (const p of parts) { out.set(p, at); at += p.length; } return out; };
+    for (const file of files) {
+      const crc = _crc32(file.data), n = file.nameBytes.length, size = file.data.length;
+      const header = join([new Uint8Array([0x50,0x4b,0x03,0x04]), u16(20), u16(0), u16(0), u16(0), u16(0), u32(crc), u32(size), u32(size), u16(n), u16(0), file.nameBytes]);
+      local.push(header, file.data);
+      const directory = join([new Uint8Array([0x50,0x4b,0x01,0x02]), u16(20), u16(20), u16(0), u16(0), u16(0), u16(0), u32(crc), u32(size), u32(size), u16(n), u16(0), u16(0), u16(0), u16(0), u32(0), u32(offset), file.nameBytes]);
+      central.push(directory);
+      offset += header.length + size;
+    }
+    const centralBytes = join(central);
+    const end = join([new Uint8Array([0x50,0x4b,0x05,0x06]), u16(0), u16(0), u16(files.length), u16(files.length), u32(centralBytes.length), u32(offset), u16(0)]);
+    return join([...local, centralBytes, end]).buffer;
   }
 
   // ═══════════════════════════════════════════════════════════
@@ -5228,6 +5421,7 @@ const STLParser = (() => {
     exportBinaryPLY,
     exportASCIIPLY,
     export3MFModel,
+    export3MFPackage,
     estimateExportSize,
     formatBytes,
   };
@@ -5318,6 +5512,9 @@ const ProjectIO = (() => {
       stats:     geometry.userData.stats || {},
       importOffset:    geometry.userData.importOffset    || null,
       importViewScale: geometry.userData.importViewScale || null,
+      supportsAdded:   geometry.userData.supportsAdded ?? false,
+      supportCount:    geometry.userData.supportCount ?? 0,
+      supportStats:    geometry.userData.supportStats || null,
     };
   }
 
@@ -5329,6 +5526,7 @@ const ProjectIO = (() => {
     if (snap.normals?.length && (!Array.isArray(snap.normals) || !snap.normals.every(Number.isFinite))) {
       throw new Error('Invalid mesh normals in project file');
     }
+    if (!_validateSupportMetadata(snap)) throw new Error('Invalid support metadata in project file');
     const posArr = new Float32Array(snap.positions);
     const geo    = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(posArr, 3));
@@ -5340,11 +5538,32 @@ const ProjectIO = (() => {
     geo.userData.stats           = snap.stats           || {};
     geo.userData.importOffset    = snap.importOffset    || { x:0, y:0, z:0 };
     geo.userData.importViewScale = snap.importViewScale || 1;
+    if (snap.supportsAdded != null) geo.userData.supportsAdded = !!snap.supportsAdded;
+    if (snap.supportCount != null) geo.userData.supportCount = Number(snap.supportCount) || 0;
+    if (snap.supportStats) geo.userData.supportStats = snap.supportStats;
     return geo;
+  }
+
+  function _validateImplantPlan(plan) {
+    if (plan == null) return true;
+    if (!Array.isArray(plan.implants) || !Array.isArray(plan.sleeves) || !Array.isArray(plan.fixationPins)) return false;
+    return plan.implants.every((implant) => {
+      if (!implant || typeof implant !== 'object' || typeof implant.system !== 'string') return false;
+      if (![implant.diameter, implant.length].every(Number.isFinite)) return false;
+      const p = implant.position || {}, r = implant.rotation || {};
+      return ['x', 'y', 'z'].every(a => Number.isFinite(p[a]) && Number.isFinite(r[a]));
+    });
+  }
+
+  function _validateSupportMetadata(snap) {
+    if (!snap || snap.supportStats == null) return true;
+    const s = snap.supportStats;
+    return !!s && Number.isFinite(Number(s.candidateCells)) && Number.isFinite(Number(s.minHeight)) && Number.isFinite(Number(s.maxHeight)) && Number.isFinite(Number(s.buildPlateY)) && Number(s.candidateCells) >= 0 && Number(s.minHeight) >= 0 && Number(s.maxHeight) >= Number(s.minHeight);
   }
 
   // ── Build project object ──────────────────────────────────
   function _buildProject(caseData, geometry, extraData = {}) {
+    if (!_validateImplantPlan(extraData.implantPlan)) throw new Error('Invalid implant plan');
     return {
       version:      FORMAT_VERSION,
       appVersion:   APP_VERSION,
@@ -5352,6 +5571,7 @@ const ProjectIO = (() => {
       caseData:     { ...caseData },
       meshSnapshot: _serializeMesh(geometry),
       marginLine:   extraData.marginLine || null,
+      implantPlan:  extraData.implantPlan || null,
     };
   }
 
@@ -5375,6 +5595,10 @@ const ProjectIO = (() => {
     }
     const marginLine     = rawMargin?.length ? rawMargin : null;
     const marginLineClosed = project.marginLine?.closed ?? false;
+    const implantPlan = project.implantPlan ?? null;
+    if (!_validateImplantPlan(implantPlan)) {
+      throw new Error('Invalid implant plan in project file');
+    }
     markClean();
     return {
       caseData: project.caseData,
@@ -5382,6 +5606,7 @@ const ProjectIO = (() => {
       stats,
       marginLine,
       marginLineClosed,
+      implantPlan,
       savedAt:   project.savedAt || null,
       wizardStep: project.caseData.wizardStep ?? 0,
     };
@@ -5542,50 +5767,61 @@ const ProjectIO = (() => {
   }
 
   // ── Export mesh (unchanged API) ───────────────────────────
+  function prepareExportGeometry(geometry, worldMatrix = null) {
+    if (!geometry) throw new Error('Missing geometry');
+    return worldMatrix ? geometry.clone().applyMatrix4(worldMatrix) : geometry;
+  }
+
   function exportMesh(geometry, format, caseId, opts = {}) {
     const safeId = (caseId || 'Case').replace(/[^a-z0-9_\-]/gi, '_');
     const scale  = opts.units === 'in' ? 1 / 25.4 : 1.0;
+    // Export the positioned mesh, not only its local geometry. The viewport
+    // keeps design transforms on the mesh so they must be baked into the
+    // export copy while preserving the original geometry and import metadata.
+    const exportGeometry = prepareExportGeometry(geometry, opts.worldMatrix);
     let blob, filename, blob2, filename2;
 
     switch (format) {
       case 'STL Binary': {
-        const buf = STLParser.exportBinarySTL(geometry, scale);
+        const buf = STLParser.exportBinarySTL(exportGeometry, scale);
         blob = new Blob([buf], { type: 'application/octet-stream' });
         filename = `DentalCAD_${safeId}.stl`;
         break;
       }
       case 'STL ASCII': {
-        const txt = STLParser.exportASCIISTL(geometry, scale);
+        const txt = STLParser.exportASCIISTL(exportGeometry, scale);
         blob = new Blob([txt], { type: 'text/plain' });
         filename = `DentalCAD_${safeId}_ascii.stl`;
         break;
       }
       case 'OBJ': {
         const base = `DentalCAD_${safeId}`;
-        blob  = new Blob([STLParser.exportOBJ(geometry, scale, base)], { type: 'text/plain' });
+        blob  = new Blob([STLParser.exportOBJ(exportGeometry, scale, base, {
+          marginLinePoints: opts.includeMarginLine ? opts.marginLinePoints : [],
+        })], { type: 'text/plain' });
         blob2 = new Blob([STLParser.exportMTL('default')],              { type: 'text/plain' });
         filename  = `${base}.obj`;
         filename2 = `${base}.mtl`;
         break;
       }
       case 'PLY Binary': {
-        const buf = STLParser.exportBinaryPLY(geometry, scale);
+        const buf = STLParser.exportBinaryPLY(exportGeometry, scale);
         blob = new Blob([buf], { type: 'application/octet-stream' });
         filename = `DentalCAD_${safeId}.ply`;
         break;
       }
       case 'PLY ASCII': {
-        blob = new Blob([STLParser.exportASCIIPLY(geometry, scale)], { type: 'text/plain' });
+        blob = new Blob([STLParser.exportASCIIPLY(exportGeometry, scale)], { type: 'text/plain' });
         filename = `DentalCAD_${safeId}_ascii.ply`;
         break;
       }
       case '3MF': {
-        blob = new Blob([STLParser.export3MFModel(geometry, scale)], { type: 'application/xml' });
+        blob = new Blob([STLParser.export3MFPackage(exportGeometry, scale)], { type: 'application/vnd.ms-package.3dmanufacturing-3dmodel' });
         filename = `DentalCAD_${safeId}.3mf`;
         break;
       }
       default: {
-        const buf = STLParser.exportBinarySTL(geometry, scale);
+        const buf = STLParser.exportBinarySTL(exportGeometry, scale);
         blob = new Blob([buf], { type: 'application/octet-stream' });
         filename = `DentalCAD_${safeId}.stl`;
       }
@@ -5593,6 +5829,25 @@ const ProjectIO = (() => {
 
     _triggerDownload(blob, filename);
     if (blob2 && filename2) setTimeout(() => _triggerDownload(blob2, filename2), 400);
+    return filename;
+  }
+
+  function exportManufacturingJob(job, caseId) {
+    if (typeof ManufacturingJob === 'undefined') throw new Error('Manufacturing job module not loaded');
+    const safeId = (caseId || job?.caseId || 'Case').replace(/[^a-z0-9_\-]/gi, '_');
+    const filename = `DentalCAD_${safeId}_manufacturing-job.json`;
+    _triggerDownload(new Blob([ManufacturingJob.toJSON(job)], { type: 'application/json' }), filename);
+    return filename;
+  }
+
+  function exportToolpath(path, caseId, machine = 'generic') {
+    if (typeof ToolpathPlanner === 'undefined') throw new Error('Toolpath planner module not loaded');
+    const safeId = (caseId || 'Case').replace(/[^a-z0-9_\-]/gi, '_');
+    const filename = `DentalCAD_${safeId}_roughing.nc`;
+    const code = ToolpathPlanner.toGCode(path, { machine });
+    const check = ToolpathPlanner.validateGCode(code, machine);
+    if (!check.valid) throw new Error(check.errors.join('; '));
+    _triggerDownload(new Blob([code], { type: 'text/plain' }), filename);
     return filename;
   }
 
@@ -5612,6 +5867,9 @@ const ProjectIO = (() => {
     autoSave, loadAutoSave, clearAutoSave, hasAutoSave,
     getRecentFiles, clearRecentFiles,
     exportMesh,
+    exportManufacturingJob,
+    exportToolpath,
+    prepareExportGeometry,
     markDirty, markClean, isDirty, onDirtyChange, getLastSaved,
   };
 })();
@@ -6824,7 +7082,7 @@ const Validator = (() => {
       }
     }
     return {
-      pass: minDist <= threshold + 0.1,
+      pass: minDist <= threshold,
       maxGap: minDist,
       contactCount,
       distanceChecks,
@@ -7356,6 +7614,7 @@ class CrownGeneratorEngine {
     }
 
     this._crownMesh = crownMesh;
+    crownMesh.updateMatrixWorld(true);
     const geom      = crownMesh.geometry;
     const pos       = geom.getAttribute('position');
     const invWorld  = crownMesh.matrixWorld.clone().invert();
@@ -7468,9 +7727,9 @@ class CrownGeneratorEngine {
     }
   }
 
-  setCementGap(mm)      { this.cementGapMM = mm; }
-  setMinThickness(mm)   { this.minThickMM  = mm; }
-  setViewportScale(s)   { this.vpScale     = s; }
+  setCementGap(mm)      { if (!Number.isFinite(mm) || mm < 0) throw new Error('Cement gap must be a finite non-negative number'); this.cementGapMM = mm; }
+  setMinThickness(mm)   { if (!Number.isFinite(mm) || mm < 0) throw new Error('Minimum thickness must be a finite non-negative number'); this.minThickMM = mm; }
+  setViewportScale(s)   { if (!Number.isFinite(s) || s <= 0) throw new Error('Viewport scale must be positive'); this.vpScale = s; }
 
   dispose() {
     this.disposeShell();
@@ -7994,6 +8253,138 @@ const SmartSuggestions = (() => {
 
 window.SmartSuggestions = SmartSuggestions;
 
+// ═══════════════════════════════════════════════════════════
+// IMPLANT PLANNING — deterministic planning geometry and validation
+// ═══════════════════════════════════════════════════════════
+const ImplantPlanning = (() => {
+  const SYSTEMS = Object.freeze({
+    generic:   { label: 'Generic',   diameters: [3.3, 3.75, 4.2, 4.8], lengths: [8, 10, 11.5, 13, 15] },
+    straumann: { label: 'Straumann', diameters: [3.3, 3.75, 4.1, 4.8], lengths: [8, 10, 12, 14, 16] },
+    nobel:     { label: 'Nobel Biocare', diameters: [3.5, 4.3, 5.0], lengths: [8, 10, 13, 15, 18] },
+  });
+
+  function validateSpec(input = {}) {
+    const spec = {
+      system: String(input.system || 'generic').toLowerCase(),
+      diameter: Number(input.diameter ?? 4.2),
+      length: Number(input.length ?? 10),
+      platform: Number(input.platform ?? 4.5),
+      position: input.position || { x: 0, y: 0, z: 0 },
+      rotation: input.rotation || { x: 0, y: 0, z: 0 },
+    };
+    const errors = [];
+    const catalog = SYSTEMS[spec.system];
+    if (!catalog) errors.push(`Unknown implant system: ${spec.system}`);
+    if (!Number.isFinite(spec.diameter) || spec.diameter < 2.5 || spec.diameter > 8) errors.push('Diameter must be between 2.5 and 8 mm');
+    if (!Number.isFinite(spec.length) || spec.length < 5 || spec.length > 25) errors.push('Length must be between 5 and 25 mm');
+    if (!Number.isFinite(spec.platform) || spec.platform <= 0 || spec.platform > 10) errors.push('Platform diameter must be positive and <= 10 mm');
+    for (const axis of ['x', 'y', 'z']) {
+      if (!Number.isFinite(Number(spec.position[axis]))) errors.push(`Invalid position.${axis}`);
+      if (!Number.isFinite(Number(spec.rotation[axis]))) errors.push(`Invalid rotation.${axis}`);
+    }
+    return { valid: errors.length === 0, errors, spec, catalog: catalog || null };
+  }
+
+  function createFixture(input = {}) {
+    const result = validateSpec(input);
+    if (!result.valid) throw new Error(result.errors.join('; '));
+    const { spec } = result;
+    const group = new THREE.Group();
+    const body = new THREE.Mesh(
+      new THREE.CylinderGeometry(spec.diameter / 2, spec.diameter / 2 * 0.88, spec.length, 32, 1),
+      new THREE.MeshBasicMaterial({ color: 0x8ec5ff, transparent: true, opacity: 0.62, wireframe: true })
+    );
+    body.position.y = -spec.length / 2;
+    group.add(body);
+    const platform = new THREE.Mesh(
+      new THREE.CylinderGeometry(spec.platform / 2, spec.platform / 2, 0.7, 32),
+      new THREE.MeshBasicMaterial({ color: 0x4ec9b0, transparent: true, opacity: 0.72, wireframe: true })
+    );
+    platform.position.y = 0.35;
+    group.add(platform);
+    const turns = Math.max(3, Math.floor(spec.length / 1.25));
+    for (let i = 0; i < turns; i++) {
+      const ring = new THREE.Mesh(
+        new THREE.TorusGeometry(spec.diameter / 2 * 0.96, 0.055, 6, 24),
+        new THREE.MeshBasicMaterial({ color: 0xdcdcaa, transparent: true, opacity: 0.8 })
+      );
+      ring.rotation.x = Math.PI / 2;
+      ring.position.y = -0.45 - i * (spec.length / turns);
+      group.add(ring);
+    }
+    group.position.set(spec.position.x, spec.position.y, spec.position.z);
+    group.rotation.set(spec.rotation.x, spec.rotation.y, spec.rotation.z);
+    group.userData = { type: 'implant-fixture', spec: { ...spec }, threadTurns: turns };
+    return group;
+  }
+
+  function createSleeve(input = {}) {
+    const diameter = Number(input.innerDiameter ?? 5.0);
+    const height = Number(input.height ?? 5.0);
+    if (!Number.isFinite(diameter) || diameter <= 0 || !Number.isFinite(height) || height <= 0) {
+      throw new Error('Sleeve dimensions must be positive');
+    }
+    const group = new THREE.Group();
+    const sleeve = new THREE.Mesh(
+      new THREE.CylinderGeometry(diameter / 2 + 1, diameter / 2 + 1, height, 32, 1, true),
+      new THREE.MeshBasicMaterial({ color: 0xf0c674, transparent: true, opacity: 0.65, wireframe: true })
+    );
+    group.add(sleeve);
+    group.userData = { type: 'guide-sleeve', innerDiameter: diameter, height, offset: Number(input.offset ?? 0) };
+    return group;
+  }
+
+  function createSurgicalGuide({ implants = [], sleeves = [], fixationPins = [], guideThickness = 2, baseMargin = 4 } = {}) {
+    if (!Array.isArray(implants) || !Array.isArray(sleeves) || !Array.isArray(fixationPins)) throw new Error('Guide inputs must be arrays');
+    if (!Number.isFinite(guideThickness) || guideThickness <= 0 || !Number.isFinite(baseMargin) || baseMargin < 0) throw new Error('Invalid guide base dimensions');
+    const group = new THREE.Group();
+    const positions = implants.map(i => i.isObject3D ? i.position : (validateSpec(i).spec.position));
+    if (positions.length) {
+      const minX = Math.min(...positions.map(p => p.x)), maxX = Math.max(...positions.map(p => p.x));
+      const minZ = Math.min(...positions.map(p => p.z)), maxZ = Math.max(...positions.map(p => p.z));
+      const base = new THREE.Mesh(
+        new THREE.BoxGeometry(Math.max(2, maxX - minX + baseMargin * 2), guideThickness, Math.max(2, maxZ - minZ + baseMargin * 2)),
+        new THREE.MeshBasicMaterial({ color: 0x80a0c0, transparent: true, opacity: 0.28, wireframe: true })
+      );
+      base.position.set((minX + maxX) / 2, 0, (minZ + maxZ) / 2);
+      group.add(base);
+    }
+    implants.forEach((implant, i) => {
+      const fixture = implant.isObject3D ? implant : createFixture(implant);
+      fixture.userData.guideIndex = i;
+      group.add(fixture);
+      const sleeve = sleeves[i] || {};
+      const sleeveMesh = createSleeve(sleeve);
+      sleeveMesh.position.copy(fixture.position);
+      sleeveMesh.rotation.copy(fixture.rotation);
+      group.add(sleeveMesh);
+    });
+    fixationPins.forEach((pin) => {
+      const p = pin.position || pin;
+      const height = Number(pin.height ?? 8);
+      if (![p.x, p.y, p.z, height].every(Number.isFinite) || height <= 0) throw new Error('Invalid fixation pin');
+      const mesh = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.0, height, 20), new THREE.MeshBasicMaterial({ color: 0xf14c4c, wireframe: true }));
+      mesh.position.set(p.x, p.y - height / 2, p.z);
+      group.add(mesh);
+    });
+    group.userData = { type: 'surgical-guide', implantCount: implants.length, fixationPinCount: fixationPins.length, guideThickness, baseMargin, hasGuideBase: positions.length > 0 };
+    return group;
+  }
+
+  function serializePlan(plan = {}) {
+    const implants = (plan.implants || []).map((i) => {
+      const result = validateSpec(i);
+      if (!result.valid) throw new Error(result.errors.join('; '));
+      return result.spec;
+    });
+    return JSON.parse(JSON.stringify({ version: 1, implants, sleeves: plan.sleeves || [], fixationPins: plan.fixationPins || [] }));
+  }
+
+  return { SYSTEMS, validateSpec, createFixture, createSleeve, createSurgicalGuide, serializePlan };
+})();
+
+window.ImplantPlanning = ImplantPlanning;
+
 // === manufacturing.js ===
 /**
  * manufacturing.js — Manufacturing pipeline helpers for DentalCAD
@@ -8131,6 +8522,46 @@ const NestingPreview = (() => {
   };
 
   /**
+   * Calculate a deterministic top-down layout and report manufacturing
+   * overflow before anything is sent to a CAM process.
+   */
+  function planLayout(geos, blankKey, opts = {}) {
+    const blank = BLANK_SIZES[blankKey] || BLANK_SIZES['98 × 14 mm (Standard)'];
+    const rawPadding = Number(opts.padding ?? 2);
+    const rawMargin = Number(opts.margin ?? 3);
+    if (!Number.isFinite(rawPadding) || rawPadding < 0 || !Number.isFinite(rawMargin) || rawMargin < 0) {
+      throw new Error('Nesting padding and margin must be finite non-negative numbers');
+    }
+    const padding = rawPadding;
+    const margin = rawMargin;
+    const matrices = opts.worldMatrices || [];
+    const boxes = (geos || []).map((geo, i) => _getBBox2D(geo, matrices[i] || opts.worldMatrix || null));
+    let curX = margin, curY = margin, rowH = 0;
+    const placements = [];
+    for (let i = 0; i < boxes.length; i++) {
+      const box = boxes[i];
+      const itemW = box.w + padding;
+      const itemD = box.d + padding;
+      if (curX + itemW > blank.w - margin && curX > margin) {
+        curX = margin; curY += rowH + padding; rowH = 0;
+      }
+      const fits = box.w <= blank.w - 2 * margin && box.d <= blank.h - 2 * margin && curY + itemD <= blank.h - margin;
+      placements.push({ ...box, px: fits ? curX : null, py: fits ? curY : null, idx: i, fits });
+      if (fits) { curX += itemW; rowH = Math.max(rowH, itemD); }
+    }
+    const placed = placements.filter(p => p.fits);
+    const usedArea = placed.reduce((sum, p) => sum + p.w * p.d, 0);
+    return {
+      blank: { ...blank },
+      padding,
+      margin,
+      placements,
+      overflow: placements.filter(p => !p.fits).map(p => p.idx),
+      utilization: blank.w * blank.h ? usedArea / (blank.w * blank.h) : 0,
+    };
+  }
+
+  /**
    * Render a top-down 2D nesting preview of geometries on a blank.
    *
    * @param {HTMLCanvasElement} canvas       — target canvas element
@@ -8184,37 +8615,8 @@ const NestingPreview = (() => {
       return;
     }
 
-    // Compute 2D bounding boxes for each geo (X-Z plane = top-down)
-    const boxes = geos.map(geo => _getBBox2D(geo));
-
-    // Simple bin-packing: place items left-to-right, wrap to next row
-    let curX = margin;
-    let curY = margin;
-    let rowH = 0;
-    const placed = [];
-
-    for (let i = 0; i < boxes.length; i++) {
-      const { w, d } = boxes[i]; // w = X extent, d = Z extent (depth = Y in top-down)
-      const itemW = w + padding;
-      const itemD = d + padding;
-
-      if (curX + itemW > blank.w - margin && curX > margin) {
-        // Wrap to next row
-        curX  = margin;
-        curY += rowH + padding;
-        rowH  = 0;
-      }
-
-      if (curY + itemD > blank.h - margin) {
-        // No more space — mark remaining as unplaced
-        placed.push({ ...boxes[i], px: null, py: null, idx: i });
-        continue;
-      }
-
-      placed.push({ ...boxes[i], px: curX, py: curY, idx: i });
-      curX += itemW;
-      rowH = Math.max(rowH, itemD);
-    }
+    const plan = planLayout(geos, blankKey, { padding, margin, worldMatrices: opts.worldMatrices, worldMatrix: opts.worldMatrix });
+    const placed = plan.placements;
 
     // Draw placed items
     placed.forEach((item, i) => {
@@ -8265,12 +8667,14 @@ const NestingPreview = (() => {
   }
 
   /** Get 2D bounding box (X-Z top-down view) */
-  function _getBBox2D(geo) {
+  function _getBBox2D(geo, worldMatrix = null) {
     const pos = geo.getAttribute('position');
     let minX = Infinity, maxX = -Infinity;
     let minZ = Infinity, maxZ = -Infinity;
     for (let i = 0; i < pos.count; i++) {
-      const x = pos.getX(i), z = pos.getZ(i);
+      const point = new THREE.Vector3(pos.getX(i), pos.getY(i), pos.getZ(i));
+      if (worldMatrix) point.applyMatrix4(worldMatrix);
+      const x = point.x, z = point.z;
       if (x < minX) minX = x; if (x > maxX) maxX = x;
       if (z < minZ) minZ = z; if (z > maxZ) maxZ = z;
     }
@@ -8291,7 +8695,7 @@ const NestingPreview = (() => {
 
   function getBlankSizes() { return Object.keys(BLANK_SIZES); }
 
-  return { render, getBlankSizes, BLANK_SIZES };
+  return { render, planLayout, getBlankSizes, BLANK_SIZES };
 })();
 
 
@@ -8338,6 +8742,7 @@ const SupportGenerator = (() => {
     // Use a grid to avoid duplicate supports
     const grid     = new Map();
     const supports = [];
+    const supportHeights = [];
 
     // Find bounding box Y min (build plate level)
     let minY = Infinity;
@@ -8389,6 +8794,7 @@ const SupportGenerator = (() => {
       cyl.attributes.position.needsUpdate = true;
       cyl.computeVertexNormals();
       supports.push(cyl);
+      supportHeights.push(height);
     }
 
     if (!supports.length) {
@@ -8396,6 +8802,7 @@ const SupportGenerator = (() => {
       const out = geo.clone();
       out.userData.supportsAdded = true;
       out.userData.supportCount  = 0;
+      out.userData.supportStats  = { candidateCells: grid.size, minHeight: 0, maxHeight: 0, buildPlateY };
       return out;
     }
 
@@ -8403,6 +8810,7 @@ const SupportGenerator = (() => {
     const merged = _mergeGeometries([geo, ...supports]);
     merged.userData.supportsAdded = true;
     merged.userData.supportCount  = supports.length;
+    merged.userData.supportStats  = { candidateCells: grid.size, minHeight: Math.min(...supportHeights), maxHeight: Math.max(...supportHeights), buildPlateY };
     Logger?.info('SupportGen', `Added ${supports.length} support columns`);
     return merged;
   }
@@ -8427,10 +8835,196 @@ const SupportGenerator = (() => {
   return { generate };
 })();
 
+// ═══════════════════════════════════════════════════════════
+// 4. TOOLPATH PLANNER — conservative 3-axis roughing preview
+// ═══════════════════════════════════════════════════════════
+const ToolpathPlanner = (() => {
+  function _bounds(geometry, worldMatrix = null) {
+    const pos = geometry?.getAttribute?.('position');
+    if (!pos || !pos.count) throw new Error('A mesh geometry is required');
+    if (pos.count % 3 !== 0) throw new Error('Mesh must contain complete triangles');
+    const b = { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity, minZ: Infinity, maxZ: -Infinity };
+    for (let i = 0; i < pos.count; i++) {
+      const point = new THREE.Vector3(pos.getX(i), pos.getY(i), pos.getZ(i));
+      if (worldMatrix) point.applyMatrix4(worldMatrix);
+      const x = point.x, y = point.y, z = point.z;
+      if (![x, y, z].every(Number.isFinite)) throw new Error('Mesh contains non-finite coordinates');
+      b.minX = Math.min(b.minX, x); b.maxX = Math.max(b.maxX, x);
+      b.minY = Math.min(b.minY, y); b.maxY = Math.max(b.maxY, y);
+      b.minZ = Math.min(b.minZ, z); b.maxZ = Math.max(b.maxZ, z);
+    }
+    return b;
+  }
+
+  function plan(geometry, opts = {}) {
+    const bounds = _bounds(geometry, opts.worldMatrix || null);
+    const stepdown = Number(opts.stepdown ?? 0.5);
+    const stepover = Number(opts.stepover ?? 1.0);
+    const margin = Number(opts.margin ?? 0.5);
+    const safeHeight = Number(opts.safeHeight ?? bounds.maxY + 5);
+    const feed = Number(opts.feed ?? 600);
+    const plungeFeed = Number(opts.plungeFeed ?? 120);
+    if (![stepdown, stepover, margin, safeHeight, feed, plungeFeed].every(Number.isFinite) || stepdown <= 0 || stepover <= 0 || margin < 0 || feed <= 0 || plungeFeed <= 0) throw new Error('Invalid toolpath parameters');
+    if (safeHeight <= bounds.maxY) throw new Error('Safe height must be above the mesh');
+    const minX = bounds.minX - margin, maxX = bounds.maxX + margin;
+    const minZ = bounds.minZ - margin, maxZ = bounds.maxZ + margin;
+    const moves = [{ kind: 'rapid', x: minX, y: safeHeight, z: minZ }];
+    let layerCount = 0, rowCount = 0, reverse = false;
+    for (let y = bounds.maxY; y >= bounds.minY - 1e-9; y -= stepdown) {
+      const layerY = Math.max(y, bounds.minY);
+      layerCount++;
+      let row = 0;
+      for (let z = minZ; z <= maxZ + 1e-9; z += stepover) {
+        const rowZ = Math.min(z, maxZ);
+        const fromX = reverse ? maxX : minX;
+        const toX = reverse ? minX : maxX;
+        moves.push({ kind: 'rapid', x: fromX, y: safeHeight, z: rowZ });
+        moves.push({ kind: 'plunge', x: fromX, y: layerY, z: rowZ, feed: plungeFeed });
+        moves.push({ kind: 'cut', x: toX, y: layerY, z: rowZ, feed });
+        reverse = !reverse; row++; rowCount++;
+        if (z + stepover > maxZ && row > 0) break;
+      }
+    }
+    moves.push({ kind: 'rapid', x: minX, y: safeHeight, z: minZ });
+    return Object.freeze({ version: 1, bounds, parameters: { stepdown, stepover, margin, safeHeight, feed, plungeFeed }, moves, layerCount, rowCount });
+  }
+
+  function validate(path) {
+    const errors = [];
+    if (!path || path.version !== 1) errors.push('Unsupported toolpath version');
+    if (!Array.isArray(path?.moves) || path.moves.length < 4) errors.push('Toolpath has too few moves');
+    if (path?.parameters?.safeHeight <= path?.bounds?.maxY) errors.push('Toolpath safe height is unsafe');
+    if (path?.bounds && !['minX','maxX','minY','maxY','minZ','maxZ'].every(k => Number.isFinite(path.bounds[k]))) errors.push('Toolpath bounds are invalid');
+    if (path?.moves?.length && path.moves[0].kind !== 'rapid') errors.push('Toolpath must begin with a rapid move');
+    for (const move of path?.moves || []) {
+      if (!['rapid', 'plunge', 'cut'].includes(move.kind)) errors.push('Unknown toolpath move');
+      if (![move.x, move.y, move.z].every(Number.isFinite)) errors.push('Toolpath contains non-finite coordinates');
+      if ((move.kind === 'plunge' || move.kind === 'cut') && (!Number.isFinite(move.feed) || move.feed <= 0)) errors.push('Cutting move has invalid feed');
+      if (move.kind === 'rapid' && Number.isFinite(path?.parameters?.safeHeight) && move.y < path.parameters.safeHeight) errors.push('Rapid move below safe height');
+      if ((move.kind === 'plunge' || move.kind === 'cut') && path?.bounds && (move.y < path.bounds.minY || move.y > path.bounds.maxY)) errors.push('Cutting move outside mesh bounds');
+      const margin = Number(path?.parameters?.margin);
+      if (path?.bounds && Number.isFinite(margin) && (move.x < path.bounds.minX - margin || move.x > path.bounds.maxX + margin || move.z < path.bounds.minZ - margin || move.z > path.bounds.maxZ + margin)) errors.push('Toolpath move outside XY machining envelope');
+    }
+    return { valid: errors.length === 0, errors };
+  }
+
+  const MACHINE_PROFILES = Object.freeze({
+    generic: { label: 'Generic 3-axis', spindle: 12000, feedScale: 1, lineEnding: '\n' },
+    roland:  { label: 'Roland DG milling', spindle: 10000, feedScale: 0.8, lineEnding: '\r\n' },
+    vhf:     { label: 'vhf dental milling', spindle: 15000, feedScale: 1.1, lineEnding: '\r\n' },
+  });
+
+  function toGCode(path, opts = {}) {
+    const check = validate(path);
+    if (!check.valid) throw new Error(check.errors.join('; '));
+    const machine = String(opts.machine || 'generic').toLowerCase();
+    const profile = MACHINE_PROFILES[machine];
+    if (!profile) throw new Error(`Unknown machine profile: ${machine}`);
+    const lines = [
+      `; DentalCAD conservative roughing toolpath v${path.version}`,
+      `; Machine: ${profile.label}`,
+      `; Layers: ${path.layerCount}  Rows: ${path.rowCount}`,
+      `; WARNING: Review and post-process for the target machine before use`,
+      'G21', 'G90', 'G17', `M3 S${profile.spindle}`,
+    ];
+    for (const m of path.moves) {
+      const code = m.kind === 'rapid' ? 'G0' : 'G1';
+      const feed = m.feed ? ` F${(m.feed * profile.feedScale).toFixed(1)}` : '';
+      lines.push(`${code} X${m.x.toFixed(4)} Y${m.y.toFixed(4)} Z${m.z.toFixed(4)}${feed}`);
+    }
+    lines.push('M5', 'M30');
+    return lines.join(profile.lineEnding);
+  }
+
+  function validateGCode(text, machine = 'generic') {
+    const errors = [];
+    const profile = MACHINE_PROFILES[String(machine).toLowerCase()];
+    if (!profile) errors.push(`Unknown machine profile: ${machine}`);
+    if (typeof text !== 'string' || !text.trim()) errors.push('G-code is empty');
+    else {
+      if (!text.includes('G21')) errors.push('Missing metric units command');
+      if (!text.includes('G90')) errors.push('Missing absolute positioning command');
+      if (!text.includes('M30')) errors.push('Missing program end command');
+      if (!/\bM5(?:\s|$)/m.test(text)) errors.push('Missing spindle stop command');
+      if (/NaN|Infinity|undefined/.test(text)) errors.push('G-code contains invalid numeric values');
+      for (const line of text.split(/\r?\n/)) {
+        const motion = line.trim().match(/^G[01]\s+(.+)$/i);
+        if (!motion) continue;
+        for (const token of motion[1].trim().split(/\s+/)) {
+          if (!/^[XYZFS][+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?$/i.test(token)) errors.push(`Invalid G-code coordinate token: ${token}`);
+        }
+      }
+      if (profile && !text.includes(`Machine: ${profile.label}`)) errors.push('Machine profile header mismatch');
+    }
+    return { valid: errors.length === 0, errors };
+  }
+
+  return { plan, validate, toGCode, validateGCode, MACHINE_PROFILES };
+})();
+
+// ═══════════════════════════════════════════════════════════
+// 5. MANUFACTURING JOB — auditable CAM handoff metadata
+// ═══════════════════════════════════════════════════════════
+const ManufacturingJob = (() => {
+  function create({ geometry, caseId = 'Case', blankKey = '98 × 14 mm (Standard)', padding = 2, supportsAdded = false, supportCount = 0, toolpath = null, machine = 'generic', worldMatrix = null } = {}) {
+    if (!geometry?.getAttribute) throw new Error('A mesh geometry is required');
+    const pos = geometry.getAttribute('position');
+    if (!pos || !pos.count || pos.count % 3 !== 0) throw new Error('Mesh must contain complete triangles');
+    for (let i = 0; i < pos.array.length; i++) if (!Number.isFinite(pos.array[i])) throw new Error('Mesh contains non-finite coordinates');
+    const layout = NestingPreview.planLayout([geometry], blankKey, { padding, worldMatrices: worldMatrix ? [worldMatrix] : [] });
+    const overflow = layout.overflow.length > 0;
+    let toolpathSummary = null;
+    if (toolpath) {
+      const check = ToolpathPlanner.validate(toolpath);
+      if (!check.valid) throw new Error(check.errors.join('; '));
+      if (!ToolpathPlanner.MACHINE_PROFILES[machine]) throw new Error(`Unknown machine profile: ${machine}`);
+      toolpathSummary = { version: toolpath.version, machine, layerCount: toolpath.layerCount, rowCount: toolpath.rowCount, moveCount: toolpath.moves.length };
+    }
+    const job = {
+      version: 1,
+      caseId: String(caseId || 'Case'),
+      createdAt: new Date().toISOString(),
+      blankKey,
+      blank: layout.blank,
+      padding: layout.padding,
+      triangleCount: pos.count / 3,
+      supportsAdded: !!supportsAdded,
+      supportCount: Math.max(0, Number(supportCount) || 0),
+      supportStats: geometry.userData?.supportStats || null,
+      utilization: layout.utilization,
+      overflow,
+      toolpath: toolpathSummary,
+      status: overflow ? 'blocked' : 'ready',
+    };
+    return Object.freeze(job);
+  }
+
+  function validate(job) {
+    const errors = [];
+    if (!job || job.version !== 1) errors.push('Unsupported manufacturing job version');
+    if (!job?.caseId) errors.push('Missing case ID');
+    if (!Number.isFinite(job?.triangleCount) || job.triangleCount < 1) errors.push('Invalid triangle count');
+    if (job?.overflow) errors.push('Nesting overflow must be resolved');
+    if (!job?.blank || !(job.blank.w > 0 && job.blank.h > 0)) errors.push('Invalid blank dimensions');
+    if (job?.toolpath && (!job.toolpath.machine || !Number.isFinite(job.toolpath.layerCount) || !Number.isFinite(job.toolpath.rowCount) || !Number.isFinite(job.toolpath.moveCount) || job.toolpath.moveCount < 1)) errors.push('Invalid toolpath summary');
+    return { valid: errors.length === 0, errors };
+  }
+
+  function toJSON(job) {
+    const check = validate(job);
+    if (!check.valid) throw new Error(check.errors.join('; '));
+    return JSON.stringify(job, null, 2);
+  }
+
+  return { create, validate, toJSON };
+})();
+
 // Global exports
 window.FolderWatch        = FolderWatch;
 window.NestingPreview     = NestingPreview;
 window.SupportGenerator   = SupportGenerator;
+window.ToolpathPlanner    = ToolpathPlanner;
+window.ManufacturingJob   = ManufacturingJob;
 
 // === tools.js ===
 /**
@@ -11132,11 +11726,17 @@ const Wizard = (() => {
   }
 
   function getData() { return caseData; }
+  function setModule(name) {
+    caseData.module = String(name || 'Crown & Bridge');
+    onStepChange?.(currentStep, STEPS[currentStep]);
+    return caseData.module;
+  }
   function getStep() { return currentStep; }
   function getStepName() { return STEPS[currentStep]; }
 
-  return { init, next, back, goTo, getData, getStep, getStepName };
+  return { init, next, back, goTo, getData, setModule, getStep, getStepName };
 })();
+
 // === app.js ===
 /**
  * app.js — Main application controller v4
@@ -11743,6 +12343,8 @@ document.addEventListener('DOMContentLoaded', () => {
     btn.addEventListener('click', function () {
       document.querySelectorAll('.module-btn').forEach(b => b.classList.remove('active'));
       this.classList.add('active');
+      Wizard.setModule?.(this.dataset.module);
+      _setImplantPlanningVisible(this.dataset.module === 'Implant Module');
       setMsg(`Module: ${this.dataset.module}`);
     });
   });
@@ -11783,7 +12385,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const data = Wizard.getData();
       const geo  = Viewport.getCurrentGeometry();
       const ml   = { points: Tools.MarginLineTool.getPoints(), closed: Tools.MarginLineTool.isClosed() };
-      ProjectIO.autoSave(data, geo, { marginLine: ml });
+      ProjectIO.autoSave(data, geo, { marginLine: ml, implantPlan: _getImplantPlanSnapshot?.() });
     }, 4000); // debounce 4 s
   }
 
@@ -12161,6 +12763,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const inclML  = document.getElementById('export-margin-line')?.checked ?? true;
     const data    = Wizard.getData();
     const geo     = Viewport.getCurrentGeometry();
+    const activeMesh = Viewport.getCurrentMesh?.();
+    activeMesh?.updateMatrixWorld?.(true);
 
     if (!geo) {
       setMsg('⚠ No mesh loaded — load a scan or demo first.', 3500);
@@ -12193,6 +12797,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const filename = ProjectIO.exportMesh(geo, fmt, data.caseId, {
           units,
+          worldMatrix: activeMesh?.matrixWorld?.clone?.(),
           includeMarginLine: inclML && mlPoints.length > 0,
           marginLinePoints:  mlPoints,
         });
@@ -12224,7 +12829,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Include which wizard step we're on
     data.wizardStep = Wizard.getStep();
     const geo = Viewport.getCurrentGeometry();
-    ProjectIO.save(data, geo, { marginLine: ml });
+    ProjectIO.save(data, geo, { marginLine: ml, implantPlan: _getImplantPlanSnapshot?.() });
     document.title = document.title.replace(/^• /, '');
     document.getElementById('unsaved-indicator')?.classList.add('hidden');
     setMsg(`✔ Project saved: DentalCAD_${(data.caseId||'Case').replace(/[^a-z0-9_\-]/gi,'_')}.dcad`);
@@ -12247,7 +12852,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // ── Central restore function used by both Open and Auto-save restore ──
   function _applyLoadedProject(result) {
-    const { caseData, geometry, stats, marginLine, savedAt, wizardStep } = result;
+    const { caseData, geometry, stats, marginLine, implantPlan, savedAt, wizardStep } = result;
 
     // 1. Restore form fields and dental chart
     _restoreCaseForm(caseData);
@@ -12276,6 +12881,8 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       Viewport.render();
     }
+
+    if (implantPlan) _restoreImplantPlan?.(implantPlan);
 
     // 4. Navigate wizard to correct step
     if (typeof wizardStep === 'number' && wizardStep >= 0) {
@@ -12401,7 +13008,7 @@ document.addEventListener('DOMContentLoaded', () => {
       dz.querySelector('.drop-icon').textContent  = '📂';
       dz.querySelector('.drop-title').textContent = 'Drop scan file here';
       dz.querySelector('.drop-title').style.color = '';
-      dz.querySelector('.drop-sub').textContent   = 'Supported: .stl  .obj  .ply (ASCII)';
+      dz.querySelector('.drop-sub').textContent   = 'Supported: .stl  .obj  .ply (ASCII + Binary)';
     }
     document.getElementById('scan-info-card')?.classList.add('hidden');
     document.getElementById('scan-status').textContent = '';
@@ -12485,6 +13092,8 @@ document.addEventListener('DOMContentLoaded', () => {
     card.addEventListener('click', function () {
       const name = this.querySelector('.module-card-name').textContent;
       closeModal('modules-modal');
+      Wizard.setModule?.(name);
+      _setImplantPlanningVisible(name === 'Implant Module');
       setMsg(`Module launched: ${name}`);
       document.querySelectorAll('.module-btn').forEach(b => {
         b.classList.toggle('active', b.dataset.module === name);
@@ -12791,6 +13400,87 @@ document.addEventListener('DOMContentLoaded', () => {
   // ARTICULATOR — declaration only; UI wiring is in §4.4 below
   // ═══════════════════════════════════════════════════════════
   let _articulator = null;
+  let _implantPlan = { specs: [], fixtures: [], guide: null };
+
+  function _setImplantPlanningVisible(visible) {
+    const panel = document.getElementById('implant-planning-ui');
+    if (panel) panel.classList.toggle('hidden', !visible);
+  }
+
+  function _implantStatus(message, ok = true) {
+    const el = document.getElementById('implant-plan-status');
+    if (el) { el.textContent = message; el.style.color = ok ? 'var(--green)' : 'var(--yellow)'; }
+  }
+
+  function _clearImplantPlan() {
+    const scene = Viewport.getScene?.();
+    if (scene) {
+      _implantPlan.fixtures.forEach(m => scene.remove(m));
+      if (_implantPlan.guide) scene.remove(_implantPlan.guide);
+    }
+    _implantPlan = { specs: [], fixtures: [], guide: null };
+    _implantStatus('Implant plan cleared.');
+  }
+
+  function _getImplantPlanSnapshot() {
+    if (!window.ImplantPlanning || !_implantPlan.specs.length) return null;
+    return ImplantPlanning.serializePlan({ implants: _implantPlan.specs, sleeves: _implantPlan.specs.map(() => ({ innerDiameter: 5, height: 6 })), fixationPins: [] });
+  }
+
+  function _restoreImplantPlan(plan) {
+    if (!plan?.implants?.length || !Viewport.getScene?.()) return;
+    _clearImplantPlan();
+    try {
+      for (const spec of plan.implants) {
+        const fixture = ImplantPlanning.createFixture(spec);
+        Viewport.getScene().add(fixture);
+        _implantPlan.specs.push(spec);
+        _implantPlan.fixtures.push(fixture);
+      }
+      _implantStatus(`${_implantPlan.specs.length} fixture(s) restored.`);
+    } catch (err) { _implantStatus(`Could not restore implant plan: ${err.message}`, false); }
+  }
+
+  function _addImplantFixture() {
+    const scene = Viewport.getScene?.();
+    if (!scene || !window.ImplantPlanning) { _implantStatus('Viewport or implant planner is not ready.', false); return; }
+    const i = _implantPlan.specs.length;
+    const spec = {
+      system: document.getElementById('implant-system')?.value || 'generic',
+      diameter: parseFloat(document.getElementById('implant-diameter')?.value || 4.2),
+      length: parseFloat(document.getElementById('implant-length')?.value || 10),
+      position: { x: i * 5, y: 0, z: 0 },
+      rotation: { x: 0, y: 0, z: 0 },
+    };
+    try {
+      const fixture = ImplantPlanning.createFixture(spec);
+      scene.add(fixture);
+      _implantPlan.specs.push(spec);
+      _implantPlan.fixtures.push(fixture);
+      _implantStatus(`${_implantPlan.specs.length} fixture(s) planned.`);
+      ProjectIO.markDirty();
+    } catch (err) { _implantStatus(err.message, false); }
+  }
+
+  function _buildImplantGuide() {
+    const scene = Viewport.getScene?.();
+    if (!scene || !_implantPlan.specs.length) { _implantStatus('Add at least one fixture first.', false); return; }
+    if (_implantPlan.guide) scene.remove(_implantPlan.guide);
+    try {
+      _implantPlan.guide = ImplantPlanning.createSurgicalGuide({
+        implants: _implantPlan.specs,
+        sleeves: _implantPlan.specs.map(() => ({ innerDiameter: 5, height: 6 })),
+        fixationPins: [],
+      });
+      scene.add(_implantPlan.guide);
+      _implantStatus(`Guide built for ${_implantPlan.specs.length} fixture(s).`);
+      ProjectIO.markDirty();
+    } catch (err) { _implantStatus(err.message, false); }
+  }
+
+  document.getElementById('btn-add-implant')?.addEventListener('click', _addImplantFixture);
+  document.getElementById('btn-build-guide')?.addEventListener('click', _buildImplantGuide);
+  document.getElementById('btn-clear-implant-plan')?.addEventListener('click', _clearImplantPlan);
 
   function _initArticulator() {
     const scene = Viewport.getScene?.();
@@ -13028,11 +13718,14 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!canvas || typeof NestingPreview === 'undefined') return;
     const geo     = Viewport.getCurrentGeometry();
     const geos    = geo ? [geo] : [];
+    const activeMesh = Viewport.getCurrentMesh?.();
+    activeMesh?.updateMatrixWorld?.(true);
+    const worldMatrices = activeMesh ? [activeMesh.matrixWorld.clone()] : [];
     const blank   = document.getElementById('blank-size-select')?.value || '98 × 14 mm (Standard)';
     const pad     = parseFloat(document.getElementById('nesting-padding-review')?.value || '2');
     canvas.width  = Math.max(400, (canvas.parentElement?.clientWidth || 560) - 40);
     canvas.height = 200;
-    NestingPreview.render(canvas, geos, blank, { padding: pad });
+    NestingPreview.render(canvas, geos, blank, { padding: pad, worldMatrices });
   }
 
   // Wire blank-size select + padding input
@@ -13157,6 +13850,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const geo    = Viewport.getCurrentGeometry();
     const geos   = geo ? [geo] : [];
+    const activeMesh = Viewport.getCurrentMesh?.();
+    activeMesh?.updateMatrixWorld?.(true);
+    const worldMatrices = activeMesh ? [activeMesh.matrixWorld.clone()] : [];
     const blank  = document.getElementById('nesting-blank-size')?.value || '98 × 14 mm (Standard)';
     const pad    = parseFloat(document.getElementById('nesting-padding')?.value || '2');
 
@@ -13165,7 +13861,8 @@ document.addEventListener('DOMContentLoaded', () => {
     canvas.width  = Math.max(400, container.clientWidth - 40);
     canvas.height = 220;
 
-    NestingPreview.render(canvas, geos, blank, { padding: pad });
+    NestingPreview.render(canvas, geos, blank, { padding: pad, worldMatrices });
+    const plan = NestingPreview.planLayout?.(geos, blank, { padding: pad, worldMatrices });
 
     const info = document.getElementById('nesting-info');
     if (info) {
@@ -13173,7 +13870,9 @@ document.addEventListener('DOMContentLoaded', () => {
         info.textContent = 'Load a scan first to preview nesting.';
       } else {
         const pos = geo.getAttribute('position');
-        info.textContent = `1 restoration  |  ${(pos?.count / 3 | 0).toLocaleString()} triangles  |  Blank: ${blank}`;
+        const fitText = plan?.overflow?.length ? `  |  ⚠ ${plan.overflow.length} item(s) outside blank` : '  |  ✔ Fits blank';
+        info.textContent = `1 restoration  |  ${(pos?.count / 3 | 0).toLocaleString()} triangles  |  Blank: ${blank}${fitText}`;
+        info.style.color = plan?.overflow?.length ? 'var(--red)' : 'var(--text-dim)';
       }
     }
   }
@@ -13210,11 +13909,48 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!geo) { setMsg('Load a scan first.', 2500); return; }
     const data = Wizard.getData();
     try {
+      const blank = document.getElementById('nesting-blank-size')?.value || '98 × 14 mm (Standard)';
+      const pad = parseFloat(document.getElementById('nesting-padding')?.value || '2');
+      const activeMesh = Viewport.getCurrentMesh?.();
+      activeMesh?.updateMatrixWorld?.(true);
+      const plan = NestingPreview.planLayout?.([geo], blank, { padding: pad, worldMatrices: activeMesh ? [activeMesh.matrixWorld.clone()] : [] });
+      if (plan?.overflow?.length) { setMsg('Export blocked: restoration does not fit the selected blank.', 4500); return; }
+      const job = ManufacturingJob.create({
+        geometry: geo,
+        caseId: data.caseId,
+        blankKey: blank,
+        padding: pad,
+        supportsAdded: !!geo.userData?.supportsAdded,
+        supportCount: geo.userData?.supportCount || 0,
+        worldMatrix: activeMesh?.matrixWorld?.clone?.(),
+      });
       const filename = ProjectIO.exportMesh(geo, 'STL Binary', data.caseId + '_nested', { units: 'mm' });
-      setMsg(`Exported (with supports if added): ${filename}`);
+      const jobFile = ProjectIO.exportManufacturingJob(job, data.caseId);
+      setMsg(`Exported: ${filename} + ${jobFile}`);
     } catch (err) {
       setMsg(`Export error: ${err.message}`, 4000);
     }
+  });
+
+  document.getElementById('btn-nesting-export-gcode')?.addEventListener('click', () => {
+    const geo = Viewport.getCurrentGeometry();
+    if (!geo) { setMsg('Load a scan first.', 2500); return; }
+    const data = Wizard.getData();
+    try {
+      const blank = document.getElementById('nesting-blank-size')?.value || '98 × 14 mm (Standard)';
+      const pad = parseFloat(document.getElementById('nesting-padding')?.value || '2');
+      const activeMesh = Viewport.getCurrentMesh?.();
+      activeMesh?.updateMatrixWorld?.(true);
+      const fit = NestingPreview.planLayout?.([geo], blank, { padding: pad, worldMatrices: activeMesh ? [activeMesh.matrixWorld.clone()] : [] });
+      if (fit?.overflow?.length) { setMsg('Toolpath blocked: restoration does not fit the selected blank.', 4500); return; }
+      geo.computeBoundingBox?.();
+      const path = ToolpathPlanner.plan(geo, { margin: pad / 2, worldMatrix: activeMesh?.matrixWorld?.clone?.() });
+      const machine = document.getElementById('toolpath-machine')?.value || 'generic';
+      const job = ManufacturingJob.create({ geometry: geo, caseId: data.caseId, blankKey: blank, padding: pad, supportsAdded: !!geo.userData?.supportsAdded, supportCount: geo.userData?.supportCount || 0, toolpath: path, machine, worldMatrix: activeMesh?.matrixWorld?.clone?.() });
+      const filename = ProjectIO.exportToolpath(path, data.caseId, machine);
+      const jobFile = ProjectIO.exportManufacturingJob(job, data.caseId);
+      setMsg(`Toolpath exported: ${filename} + ${jobFile} — review/post-process before machining`, 6000);
+    } catch (err) { setMsg(`Toolpath error: ${err.message}`, 5000); }
   });
 
   // ═══════════════════════════════════════════════════════════

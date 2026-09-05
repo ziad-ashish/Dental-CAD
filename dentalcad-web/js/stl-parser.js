@@ -113,21 +113,28 @@ const STLParser = (() => {
       const line = rawLine.trim();
       if (line.startsWith('v ')) {
         const p = line.split(/\s+/);
-        rawVerts.push([parseFloat(p[1]), parseFloat(p[2]), parseFloat(p[3])]);
+        const v = [parseFloat(p[1]), parseFloat(p[2]), parseFloat(p[3])];
+        if (v.length !== 3 || !v.every(Number.isFinite)) throw new Error('Invalid OBJ vertex');
+        rawVerts.push(v);
       } else if (line.startsWith('vn ')) {
         const p = line.split(/\s+/);
-        rawNormals.push([parseFloat(p[1]), parseFloat(p[2]), parseFloat(p[3])]);
+        const n = [parseFloat(p[1]), parseFloat(p[2]), parseFloat(p[3])];
+        if (n.length !== 3 || !n.every(Number.isFinite)) throw new Error('Invalid OBJ normal');
+        rawNormals.push(n);
       } else if (line.startsWith('f ')) {
         const parts = line.split(/\s+/).slice(1);
+        if (parts.length < 3) throw new Error('Invalid OBJ face');
         // Fan-triangulate polygons (>3 verts)
         for (let i = 1; i < parts.length - 1; i++) {
           for (const token of [parts[0], parts[i], parts[i + 1]]) {
             const idx = token.split('/');
             const rawVi = parseInt(idx[0], 10);
             const vi = rawVi < 0 ? rawVerts.length + rawVi : rawVi - 1;
+            if (!Number.isInteger(rawVi) || !rawVerts[vi]) throw new Error('OBJ face references missing vertex');
             const rawVni = idx[2] ? parseInt(idx[2], 10) : 0;
             const vni = rawVni < 0 ? rawNormals.length + rawVni : rawVni - 1;
-            const v   = rawVerts[vi] || [0, 0, 0];
+            if (idx[2] && (!Number.isInteger(rawVni) || !rawNormals[vni])) throw new Error('OBJ face references missing normal');
+            const v   = rawVerts[vi];
             positions.push(v[0], v[1], v[2]);
             const n = vni >= 0 ? rawNormals[vni] : null;
             normals.push(n ? n[0] : 0, n ? n[1] : 1, n ? n[2] : 0);
@@ -180,6 +187,84 @@ const STLParser = (() => {
           normals.push(0, 1, 0);
         }
       }
+    }
+    return { positions: new Float32Array(positions), normals: new Float32Array(normals), triCount: positions.length / 9 };
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // PARSE — binary PLY (little/big endian, scalar vertex props)
+  // ═══════════════════════════════════════════════════════════
+  function _parseBinaryPLY(buffer) {
+    const bytes = new Uint8Array(buffer);
+    const marker = new TextEncoder().encode('end_header');
+    let markerAt = -1;
+    for (let i = 0; i <= bytes.length - marker.length; i++) {
+      let match = true;
+      for (let j = 0; j < marker.length; j++) if (bytes[i + j] !== marker[j]) { match = false; break; }
+      if (match) { markerAt = i; break; }
+    }
+    if (markerAt < 0) throw new Error('Invalid binary PLY header');
+    let dataStart = markerAt + marker.length;
+    while (dataStart < bytes.length && (bytes[dataStart] === 10 || bytes[dataStart] === 13 || bytes[dataStart] === 32 || bytes[dataStart] === 9)) dataStart++;
+    const header = new TextDecoder().decode(bytes.slice(0, markerAt)).replace(/\r/g, '').split('\n').map(s => s.trim()).filter(Boolean);
+    if (header[0]?.toLowerCase() !== 'ply') throw new Error('Invalid PLY header');
+    const format = header.find(line => line.startsWith('format '));
+    const little = format?.includes('binary_little_endian');
+    const big = format?.includes('binary_big_endian');
+    if (!little && !big) throw new Error('Unsupported binary PLY format');
+    const sizes = { char:1, int8:1, uchar:1, uint8:1, short:2, int16:2, ushort:2, uint16:2, int:4, int32:4, uint:4, uint32:4, float:4, float32:4, double:8, float64:8 };
+    const readValue = (view, offset, type) => {
+      const t = type.toLowerCase(), le = little;
+      if (!(t in sizes)) throw new Error(`Unsupported PLY property type: ${type}`);
+      if (t === 'char' || t === 'int8') return view.getInt8(offset);
+      if (t === 'uchar' || t === 'uint8') return view.getUint8(offset);
+      if (t === 'short' || t === 'int16') return view.getInt16(offset, le);
+      if (t === 'ushort' || t === 'uint16') return view.getUint16(offset, le);
+      if (t === 'int' || t === 'int32') return view.getInt32(offset, le);
+      if (t === 'uint' || t === 'uint32') return view.getUint32(offset, le);
+      if (t === 'float' || t === 'float32') return view.getFloat32(offset, le);
+      return view.getFloat64(offset, le);
+    };
+    const elements = [];
+    let current = null;
+    for (const line of header.slice(1)) {
+      const p = line.split(/\s+/);
+      if (p[0] === 'element') { current = { name: p[1], count: Number(p[2]), props: [] }; if (!Number.isInteger(current.count) || current.count < 0) throw new Error('Invalid PLY element count'); elements.push(current); }
+      else if (p[0] === 'property' && current) {
+        if (p[1] === 'list') current.props.push({ list: true, countType: p[2], itemType: p[3], name: p[4] });
+        else current.props.push({ list: false, type: p[1], name: p[2] });
+      }
+    }
+    const vertexEl = elements.find(e => e.name === 'vertex'), faceEl = elements.find(e => e.name === 'face');
+    if (!vertexEl || !vertexEl.count || !faceEl) throw new Error('Binary PLY requires vertex and face elements');
+    const view = new DataView(buffer), positions = [], normals = [], verts = [], vertexStride = vertexEl.props.reduce((n, p) => n + (p.list ? 0 : sizes[p.type.toLowerCase()] || 0), 0);
+    if (!vertexStride) throw new Error('Invalid binary PLY vertex properties');
+    let off = dataStart;
+    for (let i = 0; i < vertexEl.count; i++) {
+      const v = {}; for (const p of vertexEl.props) { if (p.list) throw new Error('List vertex properties are unsupported'); if (off + sizes[p.type.toLowerCase()] > buffer.byteLength) throw new Error('Truncated binary PLY vertex data'); v[p.name] = readValue(view, off, p.type); off += sizes[p.type.toLowerCase()]; }
+      if (![v.x, v.y, v.z].every(Number.isFinite)) throw new Error('Invalid binary PLY vertex');
+      verts.push(v);
+    }
+    const faceProp = faceEl.props.find(p => p.list);
+    if (!faceProp) throw new Error('Binary PLY face list is missing');
+    for (let i = 0; i < faceEl.count; i++) {
+      let ids = null;
+      for (const p of faceEl.props) {
+        if (p.list) {
+          if (off + sizes[p.countType.toLowerCase()] > buffer.byteLength) throw new Error('Truncated binary PLY face data');
+          const n = readValue(view, off, p.countType); off += sizes[p.countType.toLowerCase()];
+          if (!Number.isInteger(n) || n < 0) throw new Error('Invalid binary PLY face list');
+          const values = [];
+          for (let j = 0; j < n; j++) { if (off + sizes[p.itemType.toLowerCase()] > buffer.byteLength) throw new Error('Truncated binary PLY face data'); const value = readValue(view, off, p.itemType); off += sizes[p.itemType.toLowerCase()]; values.push(value); }
+          if (p === faceProp) ids = values;
+        } else {
+          if (!(p.type.toLowerCase() in sizes) || off + sizes[p.type.toLowerCase()] > buffer.byteLength) throw new Error('Truncated binary PLY face data');
+          off += sizes[p.type.toLowerCase()];
+        }
+      }
+      if (!ids || ids.length < 3) throw new Error('Invalid binary PLY face');
+      for (const id of ids) if (!Number.isInteger(id) || !verts[id]) throw new Error('PLY face references missing vertex');
+      for (let j = 1; j < ids.length - 1; j++) for (const id of [ids[0], ids[j], ids[j + 1]]) { const v = verts[id]; positions.push(v.x, v.y, v.z); normals.push(v.nx ?? 0, v.ny ?? 0, v.nz ?? 0); }
     }
     return { positions: new Float32Array(positions), normals: new Float32Array(normals), triCount: positions.length / 9 };
   }
@@ -270,14 +355,15 @@ const STLParser = (() => {
           if (name.endsWith('.obj')) {
             parsed = _parseOBJ(new TextDecoder().decode(buffer));
           } else if (name.endsWith('.ply')) {
-            parsed = _parseASCIIPLY(new TextDecoder().decode(buffer));
+            const header = new TextDecoder().decode(buffer.slice(0, Math.min(buffer.byteLength, 4096))).toLowerCase();
+            parsed = header.includes('format binary_little_endian') || header.includes('format binary_big_endian') ? _parseBinaryPLY(buffer) : _parseASCIIPLY(new TextDecoder().decode(buffer));
           } else if (name.endsWith('.stl') && _isBinarySTL(buffer)) {
             parsed = _parseBinarySTL(buffer);
           } else if (name.endsWith('.stl')) {
             // ASCII STL (also catches binary files that start with "solid")
             parsed = _parseASCIISTL(new TextDecoder().decode(buffer));
           } else {
-            reject(new Error('Unsupported scan format. Use STL, OBJ, or ASCII PLY.'));
+            reject(new Error('Unsupported scan format. Use STL, OBJ, or PLY.'));
             return;
           }
 
@@ -310,7 +396,11 @@ const STLParser = (() => {
    * @returns {{ pos: Float32Array, nor: Float32Array, triCount: number }}
    */
   function _getExportBuffers(geo, outputScale = 1.0) {
+    if (!geo?.getAttribute) throw new Error('A mesh geometry is required for export');
+    if (!Number.isFinite(outputScale) || outputScale <= 0) throw new Error('Export scale must be positive');
     const posAttr  = geo.getAttribute('position');
+    if (!posAttr?.count || posAttr.count % 3 !== 0) throw new Error('Mesh must contain complete triangles for export');
+    for (let i = 0; i < posAttr.array.length; i++) if (!Number.isFinite(posAttr.array[i])) throw new Error('Mesh contains non-finite coordinates');
     const normAttr = geo.getAttribute('normal');
     const vCount   = posAttr.count;
     const triCount = Math.floor(vCount / 3);
@@ -436,7 +526,7 @@ const STLParser = (() => {
   // ═══════════════════════════════════════════════════════════
   // EXPORT — OBJ  (with normals, groups, mtl reference)
   // ═══════════════════════════════════════════════════════════
-  function exportOBJ(geo, outputScale = 1.0, mtlName = null) {
+  function exportOBJ(geo, outputScale = 1.0, mtlName = null, options = {}) {
     const { pos, nor, triCount } = _getExportBuffers(geo, outputScale);
     const vCount = triCount * 3;
     const lines  = [];
@@ -466,6 +556,30 @@ const STLParser = (() => {
     for (let i = 0; i < triCount; i++) {
       const a = i*3 + 1;
       lines.push(`f ${a}//${a} ${a+1}//${a+1} ${a+2}//${a+2}`);
+    }
+
+    // Optional margin annotation as a separate OBJ line object. Margin points
+    // are stored in viewport coordinates, so use the same inverse import
+    // transform as the mesh export.
+    const margin = Array.isArray(options.marginLinePoints) ? options.marginLinePoints : [];
+    if (margin.length >= 2) {
+      const viewScale = geo.userData.importViewScale || 1;
+      const off = geo.userData.importOffset || { x: 0, y: 0, z: 0 };
+      const start = vCount + 1;
+      lines.push(`g Margin_Line`);
+      for (const p of margin) {
+        const x = (Number(p.x) / viewScale + off.x) * outputScale;
+        const y = (Number(p.y) / viewScale + off.y) * outputScale;
+        const z = (Number(p.z) / viewScale + off.z) * outputScale;
+        if ([x, y, z].every(Number.isFinite)) lines.push(`v ${x.toFixed(6)} ${y.toFixed(6)} ${z.toFixed(6)}`);
+      }
+      const end = lines.length;
+      const added = end - (lines.findIndex(l => l === `g Margin_Line`) + 1);
+      if (added >= 2) {
+        const first = start;
+        const last = start + added - 1;
+        lines.push(`l ${first} ${last}`);
+      }
     }
 
     return lines.join('\n');
@@ -585,11 +699,7 @@ const STLParser = (() => {
   }
 
   // ═══════════════════════════════════════════════════════════
-  // EXPORT — 3MF  (Open Packaging Convention XML subset)
-  // A real 3MF file is a ZIP with a .model XML inside.
-  // Since JS can't easily write ZIP without a library, we write
-  // a valid .model XML that many slicers accept directly.
-  // Full .3mf requires JSZip; we offer both options.
+  // EXPORT — 3MF package (ZIP store, no external dependency)
   // ═══════════════════════════════════════════════════════════
   function export3MFModel(geo, outputScale = 1.0) {
     const { pos, nor, triCount } = _getExportBuffers(geo, outputScale);
@@ -627,6 +737,39 @@ const STLParser = (() => {
       `  </build>`,
       `</model>`,
     ].join('\n');
+  }
+
+  function _crc32(bytes) {
+    let crc = 0xffffffff;
+    for (const byte of bytes) {
+      crc ^= byte;
+      for (let i = 0; i < 8; i++) crc = (crc >>> 1) ^ (0xedb88320 & -(crc & 1));
+    }
+    return (crc ^ 0xffffffff) >>> 0;
+  }
+
+  function export3MFPackage(geo, outputScale = 1.0) {
+    const files = [
+      ['[Content_Types].xml', '<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="model" ContentType="application/vnd.ms-package.3dmanufacturing-3dmodel+xml"/></Types>'],
+      ['_rels/.rels', '<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Target="/3D/3dmodel.model" Id="rel0" Type="http://schemas.microsoft.com/3d/2013/01/3dmodel"/></Relationships>'],
+      ['3D/3dmodel.model', export3MFModel(geo, outputScale)],
+    ].map(([name, text]) => ({ nameBytes: new TextEncoder().encode(name), data: new TextEncoder().encode(text) }));
+    const local = [], central = [];
+    let offset = 0;
+    const u16 = (v) => { const a = new Uint8Array(2); new DataView(a.buffer).setUint16(0, v, true); return a; };
+    const u32 = (v) => { const a = new Uint8Array(4); new DataView(a.buffer).setUint32(0, v >>> 0, true); return a; };
+    const join = (parts) => { const size = parts.reduce((n, p) => n + p.length, 0), out = new Uint8Array(size); let at = 0; for (const p of parts) { out.set(p, at); at += p.length; } return out; };
+    for (const file of files) {
+      const crc = _crc32(file.data), n = file.nameBytes.length, size = file.data.length;
+      const header = join([new Uint8Array([0x50,0x4b,0x03,0x04]), u16(20), u16(0), u16(0), u16(0), u16(0), u32(crc), u32(size), u32(size), u16(n), u16(0), file.nameBytes]);
+      local.push(header, file.data);
+      const directory = join([new Uint8Array([0x50,0x4b,0x01,0x02]), u16(20), u16(20), u16(0), u16(0), u16(0), u16(0), u32(crc), u32(size), u32(size), u16(n), u16(0), u16(0), u16(0), u16(0), u32(0), u32(offset), file.nameBytes]);
+      central.push(directory);
+      offset += header.length + size;
+    }
+    const centralBytes = join(central);
+    const end = join([new Uint8Array([0x50,0x4b,0x05,0x06]), u16(0), u16(0), u16(files.length), u16(files.length), u32(centralBytes.length), u32(offset), u16(0)]);
+    return join([...local, centralBytes, end]).buffer;
   }
 
   // ═══════════════════════════════════════════════════════════
@@ -667,6 +810,7 @@ const STLParser = (() => {
     exportBinaryPLY,
     exportASCIIPLY,
     export3MFModel,
+    export3MFPackage,
     estimateExportSize,
     formatBytes,
   };

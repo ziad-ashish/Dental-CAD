@@ -239,8 +239,13 @@ const Wizard = (() => {
   }
 
   function getData() { return caseData; }
+  function setModule(name) {
+    caseData.module = String(name || 'Crown & Bridge');
+    onStepChange?.(currentStep, STEPS[currentStep]);
+    return caseData.module;
+  }
   function getStep() { return currentStep; }
   function getStepName() { return STEPS[currentStep]; }
 
-  return { init, next, back, goTo, getData, getStep, getStepName };
+  return { init, next, back, goTo, getData, setModule, getStep, getStepName };
 })();

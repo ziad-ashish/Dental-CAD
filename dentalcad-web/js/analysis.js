@@ -896,7 +896,7 @@ const Validator = (() => {
       }
     }
     return {
-      pass: minDist <= threshold + 0.1,
+      pass: minDist <= threshold,
       maxGap: minDist,
       contactCount,
       distanceChecks,
@@ -1428,6 +1428,7 @@ class CrownGeneratorEngine {
     }
 
     this._crownMesh = crownMesh;
+    crownMesh.updateMatrixWorld(true);
     const geom      = crownMesh.geometry;
     const pos       = geom.getAttribute('position');
     const invWorld  = crownMesh.matrixWorld.clone().invert();
@@ -1540,9 +1541,9 @@ class CrownGeneratorEngine {
     }
   }
 
-  setCementGap(mm)      { this.cementGapMM = mm; }
-  setMinThickness(mm)   { this.minThickMM  = mm; }
-  setViewportScale(s)   { this.vpScale     = s; }
+  setCementGap(mm)      { if (!Number.isFinite(mm) || mm < 0) throw new Error('Cement gap must be a finite non-negative number'); this.cementGapMM = mm; }
+  setMinThickness(mm)   { if (!Number.isFinite(mm) || mm < 0) throw new Error('Minimum thickness must be a finite non-negative number'); this.minThickMM = mm; }
+  setViewportScale(s)   { if (!Number.isFinite(s) || s <= 0) throw new Error('Viewport scale must be positive'); this.vpScale = s; }
 
   dispose() {
     this.disposeShell();
@@ -2065,3 +2066,135 @@ const SmartSuggestions = (() => {
 })();
 
 window.SmartSuggestions = SmartSuggestions;
+
+// ═══════════════════════════════════════════════════════════
+// IMPLANT PLANNING — deterministic planning geometry and validation
+// ═══════════════════════════════════════════════════════════
+const ImplantPlanning = (() => {
+  const SYSTEMS = Object.freeze({
+    generic:   { label: 'Generic',   diameters: [3.3, 3.75, 4.2, 4.8], lengths: [8, 10, 11.5, 13, 15] },
+    straumann: { label: 'Straumann', diameters: [3.3, 3.75, 4.1, 4.8], lengths: [8, 10, 12, 14, 16] },
+    nobel:     { label: 'Nobel Biocare', diameters: [3.5, 4.3, 5.0], lengths: [8, 10, 13, 15, 18] },
+  });
+
+  function validateSpec(input = {}) {
+    const spec = {
+      system: String(input.system || 'generic').toLowerCase(),
+      diameter: Number(input.diameter ?? 4.2),
+      length: Number(input.length ?? 10),
+      platform: Number(input.platform ?? 4.5),
+      position: input.position || { x: 0, y: 0, z: 0 },
+      rotation: input.rotation || { x: 0, y: 0, z: 0 },
+    };
+    const errors = [];
+    const catalog = SYSTEMS[spec.system];
+    if (!catalog) errors.push(`Unknown implant system: ${spec.system}`);
+    if (!Number.isFinite(spec.diameter) || spec.diameter < 2.5 || spec.diameter > 8) errors.push('Diameter must be between 2.5 and 8 mm');
+    if (!Number.isFinite(spec.length) || spec.length < 5 || spec.length > 25) errors.push('Length must be between 5 and 25 mm');
+    if (!Number.isFinite(spec.platform) || spec.platform <= 0 || spec.platform > 10) errors.push('Platform diameter must be positive and <= 10 mm');
+    for (const axis of ['x', 'y', 'z']) {
+      if (!Number.isFinite(Number(spec.position[axis]))) errors.push(`Invalid position.${axis}`);
+      if (!Number.isFinite(Number(spec.rotation[axis]))) errors.push(`Invalid rotation.${axis}`);
+    }
+    return { valid: errors.length === 0, errors, spec, catalog: catalog || null };
+  }
+
+  function createFixture(input = {}) {
+    const result = validateSpec(input);
+    if (!result.valid) throw new Error(result.errors.join('; '));
+    const { spec } = result;
+    const group = new THREE.Group();
+    const body = new THREE.Mesh(
+      new THREE.CylinderGeometry(spec.diameter / 2, spec.diameter / 2 * 0.88, spec.length, 32, 1),
+      new THREE.MeshBasicMaterial({ color: 0x8ec5ff, transparent: true, opacity: 0.62, wireframe: true })
+    );
+    body.position.y = -spec.length / 2;
+    group.add(body);
+    const platform = new THREE.Mesh(
+      new THREE.CylinderGeometry(spec.platform / 2, spec.platform / 2, 0.7, 32),
+      new THREE.MeshBasicMaterial({ color: 0x4ec9b0, transparent: true, opacity: 0.72, wireframe: true })
+    );
+    platform.position.y = 0.35;
+    group.add(platform);
+    const turns = Math.max(3, Math.floor(spec.length / 1.25));
+    for (let i = 0; i < turns; i++) {
+      const ring = new THREE.Mesh(
+        new THREE.TorusGeometry(spec.diameter / 2 * 0.96, 0.055, 6, 24),
+        new THREE.MeshBasicMaterial({ color: 0xdcdcaa, transparent: true, opacity: 0.8 })
+      );
+      ring.rotation.x = Math.PI / 2;
+      ring.position.y = -0.45 - i * (spec.length / turns);
+      group.add(ring);
+    }
+    group.position.set(spec.position.x, spec.position.y, spec.position.z);
+    group.rotation.set(spec.rotation.x, spec.rotation.y, spec.rotation.z);
+    group.userData = { type: 'implant-fixture', spec: { ...spec }, threadTurns: turns };
+    return group;
+  }
+
+  function createSleeve(input = {}) {
+    const diameter = Number(input.innerDiameter ?? 5.0);
+    const height = Number(input.height ?? 5.0);
+    if (!Number.isFinite(diameter) || diameter <= 0 || !Number.isFinite(height) || height <= 0) {
+      throw new Error('Sleeve dimensions must be positive');
+    }
+    const group = new THREE.Group();
+    const sleeve = new THREE.Mesh(
+      new THREE.CylinderGeometry(diameter / 2 + 1, diameter / 2 + 1, height, 32, 1, true),
+      new THREE.MeshBasicMaterial({ color: 0xf0c674, transparent: true, opacity: 0.65, wireframe: true })
+    );
+    group.add(sleeve);
+    group.userData = { type: 'guide-sleeve', innerDiameter: diameter, height, offset: Number(input.offset ?? 0) };
+    return group;
+  }
+
+  function createSurgicalGuide({ implants = [], sleeves = [], fixationPins = [], guideThickness = 2, baseMargin = 4 } = {}) {
+    if (!Array.isArray(implants) || !Array.isArray(sleeves) || !Array.isArray(fixationPins)) throw new Error('Guide inputs must be arrays');
+    if (!Number.isFinite(guideThickness) || guideThickness <= 0 || !Number.isFinite(baseMargin) || baseMargin < 0) throw new Error('Invalid guide base dimensions');
+    const group = new THREE.Group();
+    const positions = implants.map(i => i.isObject3D ? i.position : (validateSpec(i).spec.position));
+    if (positions.length) {
+      const minX = Math.min(...positions.map(p => p.x)), maxX = Math.max(...positions.map(p => p.x));
+      const minZ = Math.min(...positions.map(p => p.z)), maxZ = Math.max(...positions.map(p => p.z));
+      const base = new THREE.Mesh(
+        new THREE.BoxGeometry(Math.max(2, maxX - minX + baseMargin * 2), guideThickness, Math.max(2, maxZ - minZ + baseMargin * 2)),
+        new THREE.MeshBasicMaterial({ color: 0x80a0c0, transparent: true, opacity: 0.28, wireframe: true })
+      );
+      base.position.set((minX + maxX) / 2, 0, (minZ + maxZ) / 2);
+      group.add(base);
+    }
+    implants.forEach((implant, i) => {
+      const fixture = implant.isObject3D ? implant : createFixture(implant);
+      fixture.userData.guideIndex = i;
+      group.add(fixture);
+      const sleeve = sleeves[i] || {};
+      const sleeveMesh = createSleeve(sleeve);
+      sleeveMesh.position.copy(fixture.position);
+      sleeveMesh.rotation.copy(fixture.rotation);
+      group.add(sleeveMesh);
+    });
+    fixationPins.forEach((pin) => {
+      const p = pin.position || pin;
+      const height = Number(pin.height ?? 8);
+      if (![p.x, p.y, p.z, height].every(Number.isFinite) || height <= 0) throw new Error('Invalid fixation pin');
+      const mesh = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.0, height, 20), new THREE.MeshBasicMaterial({ color: 0xf14c4c, wireframe: true }));
+      mesh.position.set(p.x, p.y - height / 2, p.z);
+      group.add(mesh);
+    });
+    group.userData = { type: 'surgical-guide', implantCount: implants.length, fixationPinCount: fixationPins.length, guideThickness, baseMargin, hasGuideBase: positions.length > 0 };
+    return group;
+  }
+
+  function serializePlan(plan = {}) {
+    const implants = (plan.implants || []).map((i) => {
+      const result = validateSpec(i);
+      if (!result.valid) throw new Error(result.errors.join('; '));
+      return result.spec;
+    });
+    return JSON.parse(JSON.stringify({ version: 1, implants, sleeves: plan.sleeves || [], fixationPins: plan.fixationPins || [] }));
+  }
+
+  return { SYSTEMS, validateSpec, createFixture, createSleeve, createSurgicalGuide, serializePlan };
+})();
+
+window.ImplantPlanning = ImplantPlanning;

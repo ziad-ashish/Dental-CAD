@@ -1,5 +1,45 @@
 [
   {
+    "name": "Implant planning UI is wired to planner actions",
+    "status": "PASS"
+  },
+  {
+    "name": "App DOM references resolve to markup or explicit runtime-created nodes",
+    "status": "PASS"
+  },
+  {
+    "name": "Nesting export is gated by blank-fit validation",
+    "status": "PASS"
+  },
+  {
+    "name": "Nesting export emits an auditable manufacturing job",
+    "status": "PASS"
+  },
+  {
+    "name": "Toolpath export is wired with fit and safe-height gates",
+    "status": "PASS"
+  },
+  {
+    "name": "Toolpath machine selector reaches exporter",
+    "status": "PASS"
+  },
+  {
+    "name": "Index HTML has unique IDs and valid local script references",
+    "status": "PASS"
+  },
+  {
+    "name": "Scan UI advertises binary and ASCII PLY support",
+    "status": "PASS"
+  },
+  {
+    "name": "Bundled HTML contains every authoritative module marker",
+    "status": "PASS"
+  },
+  {
+    "name": "Build script preserves modular CSS source",
+    "status": "PASS"
+  },
+  {
     "name": "Syntax analysis.js",
     "status": "PASS"
   },
@@ -52,7 +92,23 @@
     "status": "PASS"
   },
   {
+    "name": "Malformed OBJ face is rejected instead of defaulting vertices",
+    "status": "PASS"
+  },
+  {
     "name": "ASCII PLY import triangulates polygon faces",
+    "status": "PASS"
+  },
+  {
+    "name": "Binary PLY export imports back with triangle data",
+    "status": "PASS"
+  },
+  {
+    "name": "Binary PLY importer consumes extra face properties",
+    "status": "PASS"
+  },
+  {
+    "name": "Binary PLY importer supports big-endian vertex and face data",
     "status": "PASS"
   },
   {
@@ -76,7 +132,19 @@
     "status": "PASS"
   },
   {
+    "name": "Mesh exporters reject incomplete and non-finite geometry",
+    "status": "PASS"
+  },
+  {
+    "name": "OBJ export embeds margin line annotation when requested",
+    "status": "PASS"
+  },
+  {
     "name": "3MF export has model resources and triangle data",
+    "status": "PASS"
+  },
+  {
+    "name": "3MF export is a valid ZIP package with relationships",
     "status": "PASS"
   },
   {
@@ -88,7 +156,39 @@
     "status": "PASS"
   },
   {
+    "name": "Tooth library maps FDI types and scales morphology",
+    "status": "PASS"
+  },
+  {
+    "name": "Implant planning validates catalog dimensions",
+    "status": "PASS"
+  },
+  {
+    "name": "Implant fixture creates platform and thread geometry",
+    "status": "PASS"
+  },
+  {
+    "name": "Surgical guide creates base, sleeves and fixation pins",
+    "status": "PASS"
+  },
+  {
+    "name": "Surgical guide rejects invalid base dimensions",
+    "status": "PASS"
+  },
+  {
+    "name": "Implant planning rejects unsafe dimensions",
+    "status": "PASS"
+  },
+  {
+    "name": "Implant plan serialization rejects invalid entries",
+    "status": "PASS"
+  },
+  {
     "name": "Cement shell follows transformed preparation",
+    "status": "PASS"
+  },
+  {
+    "name": "Crown adaptation updates transformed base and validates parameters",
     "status": "PASS"
   },
   {
@@ -97,6 +197,34 @@
   },
   {
     "name": "Large autosave retains mesh and margin",
+    "status": "PASS"
+  },
+  {
+    "name": "Project persistence roundtrips implant plan",
+    "status": "PASS"
+  },
+  {
+    "name": "Project persistence roundtrips support metadata",
+    "status": "PASS"
+  },
+  {
+    "name": "Project loader rejects corrupt support metadata",
+    "status": "PASS"
+  },
+  {
+    "name": "Project loader rejects malformed implant plan",
+    "status": "PASS"
+  },
+  {
+    "name": "Project loader rejects non-finite implant dimensions",
+    "status": "PASS"
+  },
+  {
+    "name": "Project save rejects malformed implant plan before serialization",
+    "status": "PASS"
+  },
+  {
+    "name": "Export preparation bakes world transform without mutating source",
     "status": "PASS"
   },
   {
@@ -128,6 +256,82 @@
     "status": "PASS"
   },
   {
+    "name": "Nesting planner reports placements and utilization",
+    "status": "PASS"
+  },
+  {
+    "name": "Nesting planner rejects oversized restorations",
+    "status": "PASS"
+  },
+  {
+    "name": "Nesting planner rejects invalid padding and margin",
+    "status": "PASS"
+  },
+  {
+    "name": "Nesting planner respects world transform bounds",
+    "status": "PASS"
+  },
+  {
+    "name": "Manufacturing job is ready only when nesting fits",
+    "status": "PASS"
+  },
+  {
+    "name": "Manufacturing job blocks overflow and invalid meshes",
+    "status": "PASS"
+  },
+  {
+    "name": "Toolpath planner produces safe finite raster moves",
+    "status": "PASS"
+  },
+  {
+    "name": "Toolpath machine profiles change post-processor output",
+    "status": "PASS"
+  },
+  {
+    "name": "Generated G-code passes post-generation validation",
+    "status": "PASS"
+  },
+  {
+    "name": "G-code validation rejects malformed motion tokens and missing spindle stop",
+    "status": "PASS"
+  },
+  {
+    "name": "Manufacturing job records toolpath machine summary",
+    "status": "PASS"
+  },
+  {
+    "name": "Manufacturing job fit uses world transform",
+    "status": "PASS"
+  },
+  {
+    "name": "Manufacturing job rejects corrupt toolpath summary",
+    "status": "PASS"
+  },
+  {
+    "name": "Toolpath planner rejects unsafe safe height",
+    "status": "PASS"
+  },
+  {
+    "name": "Toolpath planner rejects incomplete triangles",
+    "status": "PASS"
+  },
+  {
+    "name": "Toolpath validation rejects unsafe rapid and cutting moves",
+    "status": "PASS"
+  },
+  {
+    "name": "Toolpath validation rejects moves outside machining envelope",
+    "status": "PASS"
+  },
+  {
+    "name": "Toolpath validation rejects invalid sequence and feed",
+    "status": "PASS"
+  },
+  {
+    "name": "Toolpath planner respects world transform bounds",
+    "status": "PASS"
+  },
+  {
     "name": "Validator welds duplicated STL vertices for manifold check",
     "status": "PASS"
   },
@@ -137,6 +341,10 @@
   },
   {
     "name": "Validator contact index rejects separated meshes",
+    "status": "PASS"
+  },
+  {
+    "name": "Validator contact threshold does not allow extra clearance",
     "status": "PASS"
   },
   {

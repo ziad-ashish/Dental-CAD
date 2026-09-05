@@ -403,7 +403,7 @@
             <div id="drop-zone">
               <div class="drop-icon">📂</div>
               <div class="drop-title">Drop scan file here</div>
-              <div class="drop-sub">Supported: .stl &nbsp; .obj &nbsp; .ply (ASCII)</div>
+              <div class="drop-sub">Supported: .stl &nbsp; .obj &nbsp; .ply (ASCII + Binary)</div>
             </div>
             <input id="scan-file-input" type="file" accept=".stl,.obj,.ply" style="display:none" />
 
@@ -858,6 +858,30 @@
                   </div>
                 </div>
 
+                <!-- ── Implant Planning ── -->
+                <div id="implant-planning-ui" class="hidden"
+                     style="margin-top:14px;border-top:1px solid var(--border);padding-top:10px">
+                  <div class="param-label" style="color:var(--accent-dim)">🦷 Implant Planning</div>
+                  <div class="param-label">System</div>
+                  <select id="implant-system" class="form-select" style="width:100%;height:26px;font-size:11px">
+                    <option value="generic">Generic</option>
+                    <option value="straumann">Straumann</option>
+                    <option value="nobel">Nobel Biocare</option>
+                  </select>
+                  <div style="display:flex;gap:5px;margin-top:6px">
+                    <div style="flex:1"><div class="param-label">Diameter (mm)</div>
+                      <input id="implant-diameter" type="number" class="form-input" value="4.2" min="2.5" max="8" step="0.1" style="height:26px;font-size:11px"/></div>
+                    <div style="flex:1"><div class="param-label">Length (mm)</div>
+                      <input id="implant-length" type="number" class="form-input" value="10" min="5" max="25" step="0.5" style="height:26px;font-size:11px"/></div>
+                  </div>
+                  <div style="display:flex;gap:4px;margin-top:7px">
+                    <button id="btn-add-implant" class="btn btn-sm" style="flex:1">＋ Add Fixture</button>
+                    <button id="btn-build-guide" class="btn btn-sm" style="flex:1">⊙ Build Guide</button>
+                  </div>
+                  <button id="btn-clear-implant-plan" class="btn btn-sm btn-danger" style="width:100%;margin-top:4px">Clear Implant Plan</button>
+                  <div id="implant-plan-status" style="font-size:10px;color:var(--text-dim);margin-top:5px;min-height:14px;font-family:var(--font-mono)"></div>
+                </div>
+
                 <!-- ── Occlusion Heatmap ── -->
                 <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:10px">
                   <div class="param-label" style="color:var(--accent-dim)">🦷 Occlusion Heatmap</div>
@@ -1277,7 +1301,7 @@
                     <option value="OBJ">OBJ + MTL  — with normals &amp; material</option>
                     <option value="PLY Binary">PLY Binary  — with normals</option>
                     <option value="PLY ASCII">PLY ASCII  — human-readable</option>
-                    <option value="3MF">3MF (XML)  — 3D Manufacturing Format</option>
+                    <option value="3MF">3MF Package — 3D Manufacturing Format</option>
                   </select>
                   <div id="export-size-preview"
                        style="font-size:11px;color:var(--text-dim);padding-left:2px">
@@ -1724,8 +1748,8 @@
     </div>
     <div class="modal-body" style="padding:16px 20px">
       <p style="font-size:12px;color:var(--text-dim);line-height:1.6;margin-bottom:12px">
-        Visualises how restorations fit on a milling blank before export.
-        Actual nesting for CAM requires manufacturer-specific software.
+        Validates fit on the selected blank and can generate a conservative
+        3-axis roughing toolpath for review before machine-specific post-processing.
       </p>
       <div style="display:flex;gap:12px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
         <div style="display:flex;align-items:center;gap:8px">
@@ -1743,6 +1767,14 @@
         <button id="btn-nesting-export-stl" class="btn btn-sm btn-primary">
           📤 Export STL + Supports
         </button>
+        <button id="btn-nesting-export-gcode" class="btn btn-sm" style="border-color:rgba(78,201,176,.4);color:var(--green)">
+          ⚙ Export Toolpath (G-code)
+        </button>
+        <select id="toolpath-machine" class="form-select" style="height:28px;font-size:11px;width:155px" title="G-code machine profile">
+          <option value="generic">Generic 3-axis</option>
+          <option value="roland">Roland DG</option>
+          <option value="vhf">vhf dental</option>
+        </select>
       </div>
       <canvas id="nesting-canvas" width="560" height="220"
         style="width:100%;border:1px solid var(--border);border-radius:6px;

@@ -33,17 +33,10 @@ Write-Host "    Created source directories"
 # ─────────────────────────────────────────────────────────────
 # PHASE 2: Extract CSS
 # ─────────────────────────────────────────────────────────────
-Write-Host "`n[2] Extracting CSS..." -ForegroundColor Yellow
-$cssOpenTag  = '<style>'
-$cssCloseTag = '</style>'
-$cssStart = $src.IndexOf($cssOpenTag)
-if ($cssStart -lt 0) { throw "Cannot find <style> tag" }
-$cssContentStart = $cssStart + $cssOpenTag.Length
-$cssEnd = $src.IndexOf($cssCloseTag, $cssContentStart)
-if ($cssEnd -lt 0) { throw "Cannot find </style> tag" }
-$cssText = $src.Substring($cssContentStart, $cssEnd - $cssContentStart)
-[System.IO.File]::WriteAllText("$srcDir\css\style.css", $cssText, [System.Text.UTF8Encoding]::new($false))
-Write-Host "    Wrote style.css  ($($cssText.Length) chars)"
+Write-Host "`n[2] Preserving modular CSS source..." -ForegroundColor Yellow
+if (-not (Test-Path "$srcDir\css\style.css")) { throw "Missing modular style.css" }
+$cssText = [System.IO.File]::ReadAllText("$srcDir\css\style.css", [System.Text.Encoding]::UTF8)
+Write-Host "    Using style.css  ($($cssText.Length) chars)"
 
 # ─────────────────────────────────────────────────────────────
 # PHASE 3: Extract HTML body

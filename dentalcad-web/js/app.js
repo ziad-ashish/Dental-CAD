@@ -603,6 +603,8 @@ document.addEventListener('DOMContentLoaded', () => {
     btn.addEventListener('click', function () {
       document.querySelectorAll('.module-btn').forEach(b => b.classList.remove('active'));
       this.classList.add('active');
+      Wizard.setModule?.(this.dataset.module);
+      _setImplantPlanningVisible(this.dataset.module === 'Implant Module');
       setMsg(`Module: ${this.dataset.module}`);
     });
   });
@@ -643,7 +645,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const data = Wizard.getData();
       const geo  = Viewport.getCurrentGeometry();
       const ml   = { points: Tools.MarginLineTool.getPoints(), closed: Tools.MarginLineTool.isClosed() };
-      ProjectIO.autoSave(data, geo, { marginLine: ml });
+      ProjectIO.autoSave(data, geo, { marginLine: ml, implantPlan: _getImplantPlanSnapshot?.() });
     }, 4000); // debounce 4 s
   }
 
@@ -1021,6 +1023,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const inclML  = document.getElementById('export-margin-line')?.checked ?? true;
     const data    = Wizard.getData();
     const geo     = Viewport.getCurrentGeometry();
+    const activeMesh = Viewport.getCurrentMesh?.();
+    activeMesh?.updateMatrixWorld?.(true);
 
     if (!geo) {
       setMsg('⚠ No mesh loaded — load a scan or demo first.', 3500);
@@ -1053,6 +1057,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const filename = ProjectIO.exportMesh(geo, fmt, data.caseId, {
           units,
+          worldMatrix: activeMesh?.matrixWorld?.clone?.(),
           includeMarginLine: inclML && mlPoints.length > 0,
           marginLinePoints:  mlPoints,
         });
@@ -1084,7 +1089,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Include which wizard step we're on
     data.wizardStep = Wizard.getStep();
     const geo = Viewport.getCurrentGeometry();
-    ProjectIO.save(data, geo, { marginLine: ml });
+    ProjectIO.save(data, geo, { marginLine: ml, implantPlan: _getImplantPlanSnapshot?.() });
     document.title = document.title.replace(/^• /, '');
     document.getElementById('unsaved-indicator')?.classList.add('hidden');
     setMsg(`✔ Project saved: DentalCAD_${(data.caseId||'Case').replace(/[^a-z0-9_\-]/gi,'_')}.dcad`);
@@ -1107,7 +1112,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // ── Central restore function used by both Open and Auto-save restore ──
   function _applyLoadedProject(result) {
-    const { caseData, geometry, stats, marginLine, savedAt, wizardStep } = result;
+    const { caseData, geometry, stats, marginLine, implantPlan, savedAt, wizardStep } = result;
 
     // 1. Restore form fields and dental chart
     _restoreCaseForm(caseData);
@@ -1136,6 +1141,8 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       Viewport.render();
     }
+
+    if (implantPlan) _restoreImplantPlan?.(implantPlan);
 
     // 4. Navigate wizard to correct step
     if (typeof wizardStep === 'number' && wizardStep >= 0) {
@@ -1261,7 +1268,7 @@ document.addEventListener('DOMContentLoaded', () => {
       dz.querySelector('.drop-icon').textContent  = '📂';
       dz.querySelector('.drop-title').textContent = 'Drop scan file here';
       dz.querySelector('.drop-title').style.color = '';
-      dz.querySelector('.drop-sub').textContent   = 'Supported: .stl  .obj  .ply (ASCII)';
+      dz.querySelector('.drop-sub').textContent   = 'Supported: .stl  .obj  .ply (ASCII + Binary)';
     }
     document.getElementById('scan-info-card')?.classList.add('hidden');
     document.getElementById('scan-status').textContent = '';
@@ -1345,6 +1352,8 @@ document.addEventListener('DOMContentLoaded', () => {
     card.addEventListener('click', function () {
       const name = this.querySelector('.module-card-name').textContent;
       closeModal('modules-modal');
+      Wizard.setModule?.(name);
+      _setImplantPlanningVisible(name === 'Implant Module');
       setMsg(`Module launched: ${name}`);
       document.querySelectorAll('.module-btn').forEach(b => {
         b.classList.toggle('active', b.dataset.module === name);
@@ -1651,6 +1660,87 @@ document.addEventListener('DOMContentLoaded', () => {
   // ARTICULATOR — declaration only; UI wiring is in §4.4 below
   // ═══════════════════════════════════════════════════════════
   let _articulator = null;
+  let _implantPlan = { specs: [], fixtures: [], guide: null };
+
+  function _setImplantPlanningVisible(visible) {
+    const panel = document.getElementById('implant-planning-ui');
+    if (panel) panel.classList.toggle('hidden', !visible);
+  }
+
+  function _implantStatus(message, ok = true) {
+    const el = document.getElementById('implant-plan-status');
+    if (el) { el.textContent = message; el.style.color = ok ? 'var(--green)' : 'var(--yellow)'; }
+  }
+
+  function _clearImplantPlan() {
+    const scene = Viewport.getScene?.();
+    if (scene) {
+      _implantPlan.fixtures.forEach(m => scene.remove(m));
+      if (_implantPlan.guide) scene.remove(_implantPlan.guide);
+    }
+    _implantPlan = { specs: [], fixtures: [], guide: null };
+    _implantStatus('Implant plan cleared.');
+  }
+
+  function _getImplantPlanSnapshot() {
+    if (!window.ImplantPlanning || !_implantPlan.specs.length) return null;
+    return ImplantPlanning.serializePlan({ implants: _implantPlan.specs, sleeves: _implantPlan.specs.map(() => ({ innerDiameter: 5, height: 6 })), fixationPins: [] });
+  }
+
+  function _restoreImplantPlan(plan) {
+    if (!plan?.implants?.length || !Viewport.getScene?.()) return;
+    _clearImplantPlan();
+    try {
+      for (const spec of plan.implants) {
+        const fixture = ImplantPlanning.createFixture(spec);
+        Viewport.getScene().add(fixture);
+        _implantPlan.specs.push(spec);
+        _implantPlan.fixtures.push(fixture);
+      }
+      _implantStatus(`${_implantPlan.specs.length} fixture(s) restored.`);
+    } catch (err) { _implantStatus(`Could not restore implant plan: ${err.message}`, false); }
+  }
+
+  function _addImplantFixture() {
+    const scene = Viewport.getScene?.();
+    if (!scene || !window.ImplantPlanning) { _implantStatus('Viewport or implant planner is not ready.', false); return; }
+    const i = _implantPlan.specs.length;
+    const spec = {
+      system: document.getElementById('implant-system')?.value || 'generic',
+      diameter: parseFloat(document.getElementById('implant-diameter')?.value || 4.2),
+      length: parseFloat(document.getElementById('implant-length')?.value || 10),
+      position: { x: i * 5, y: 0, z: 0 },
+      rotation: { x: 0, y: 0, z: 0 },
+    };
+    try {
+      const fixture = ImplantPlanning.createFixture(spec);
+      scene.add(fixture);
+      _implantPlan.specs.push(spec);
+      _implantPlan.fixtures.push(fixture);
+      _implantStatus(`${_implantPlan.specs.length} fixture(s) planned.`);
+      ProjectIO.markDirty();
+    } catch (err) { _implantStatus(err.message, false); }
+  }
+
+  function _buildImplantGuide() {
+    const scene = Viewport.getScene?.();
+    if (!scene || !_implantPlan.specs.length) { _implantStatus('Add at least one fixture first.', false); return; }
+    if (_implantPlan.guide) scene.remove(_implantPlan.guide);
+    try {
+      _implantPlan.guide = ImplantPlanning.createSurgicalGuide({
+        implants: _implantPlan.specs,
+        sleeves: _implantPlan.specs.map(() => ({ innerDiameter: 5, height: 6 })),
+        fixationPins: [],
+      });
+      scene.add(_implantPlan.guide);
+      _implantStatus(`Guide built for ${_implantPlan.specs.length} fixture(s).`);
+      ProjectIO.markDirty();
+    } catch (err) { _implantStatus(err.message, false); }
+  }
+
+  document.getElementById('btn-add-implant')?.addEventListener('click', _addImplantFixture);
+  document.getElementById('btn-build-guide')?.addEventListener('click', _buildImplantGuide);
+  document.getElementById('btn-clear-implant-plan')?.addEventListener('click', _clearImplantPlan);
 
   function _initArticulator() {
     const scene = Viewport.getScene?.();
@@ -1888,11 +1978,14 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!canvas || typeof NestingPreview === 'undefined') return;
     const geo     = Viewport.getCurrentGeometry();
     const geos    = geo ? [geo] : [];
+    const activeMesh = Viewport.getCurrentMesh?.();
+    activeMesh?.updateMatrixWorld?.(true);
+    const worldMatrices = activeMesh ? [activeMesh.matrixWorld.clone()] : [];
     const blank   = document.getElementById('blank-size-select')?.value || '98 × 14 mm (Standard)';
     const pad     = parseFloat(document.getElementById('nesting-padding-review')?.value || '2');
     canvas.width  = Math.max(400, (canvas.parentElement?.clientWidth || 560) - 40);
     canvas.height = 200;
-    NestingPreview.render(canvas, geos, blank, { padding: pad });
+    NestingPreview.render(canvas, geos, blank, { padding: pad, worldMatrices });
   }
 
   // Wire blank-size select + padding input
@@ -2017,6 +2110,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const geo    = Viewport.getCurrentGeometry();
     const geos   = geo ? [geo] : [];
+    const activeMesh = Viewport.getCurrentMesh?.();
+    activeMesh?.updateMatrixWorld?.(true);
+    const worldMatrices = activeMesh ? [activeMesh.matrixWorld.clone()] : [];
     const blank  = document.getElementById('nesting-blank-size')?.value || '98 × 14 mm (Standard)';
     const pad    = parseFloat(document.getElementById('nesting-padding')?.value || '2');
 
@@ -2025,7 +2121,8 @@ document.addEventListener('DOMContentLoaded', () => {
     canvas.width  = Math.max(400, container.clientWidth - 40);
     canvas.height = 220;
 
-    NestingPreview.render(canvas, geos, blank, { padding: pad });
+    NestingPreview.render(canvas, geos, blank, { padding: pad, worldMatrices });
+    const plan = NestingPreview.planLayout?.(geos, blank, { padding: pad, worldMatrices });
 
     const info = document.getElementById('nesting-info');
     if (info) {
@@ -2033,7 +2130,9 @@ document.addEventListener('DOMContentLoaded', () => {
         info.textContent = 'Load a scan first to preview nesting.';
       } else {
         const pos = geo.getAttribute('position');
-        info.textContent = `1 restoration  |  ${(pos?.count / 3 | 0).toLocaleString()} triangles  |  Blank: ${blank}`;
+        const fitText = plan?.overflow?.length ? `  |  ⚠ ${plan.overflow.length} item(s) outside blank` : '  |  ✔ Fits blank';
+        info.textContent = `1 restoration  |  ${(pos?.count / 3 | 0).toLocaleString()} triangles  |  Blank: ${blank}${fitText}`;
+        info.style.color = plan?.overflow?.length ? 'var(--red)' : 'var(--text-dim)';
       }
     }
   }
@@ -2070,11 +2169,48 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!geo) { setMsg('Load a scan first.', 2500); return; }
     const data = Wizard.getData();
     try {
+      const blank = document.getElementById('nesting-blank-size')?.value || '98 × 14 mm (Standard)';
+      const pad = parseFloat(document.getElementById('nesting-padding')?.value || '2');
+      const activeMesh = Viewport.getCurrentMesh?.();
+      activeMesh?.updateMatrixWorld?.(true);
+      const plan = NestingPreview.planLayout?.([geo], blank, { padding: pad, worldMatrices: activeMesh ? [activeMesh.matrixWorld.clone()] : [] });
+      if (plan?.overflow?.length) { setMsg('Export blocked: restoration does not fit the selected blank.', 4500); return; }
+      const job = ManufacturingJob.create({
+        geometry: geo,
+        caseId: data.caseId,
+        blankKey: blank,
+        padding: pad,
+        supportsAdded: !!geo.userData?.supportsAdded,
+        supportCount: geo.userData?.supportCount || 0,
+        worldMatrix: activeMesh?.matrixWorld?.clone?.(),
+      });
       const filename = ProjectIO.exportMesh(geo, 'STL Binary', data.caseId + '_nested', { units: 'mm' });
-      setMsg(`Exported (with supports if added): ${filename}`);
+      const jobFile = ProjectIO.exportManufacturingJob(job, data.caseId);
+      setMsg(`Exported: ${filename} + ${jobFile}`);
     } catch (err) {
       setMsg(`Export error: ${err.message}`, 4000);
     }
+  });
+
+  document.getElementById('btn-nesting-export-gcode')?.addEventListener('click', () => {
+    const geo = Viewport.getCurrentGeometry();
+    if (!geo) { setMsg('Load a scan first.', 2500); return; }
+    const data = Wizard.getData();
+    try {
+      const blank = document.getElementById('nesting-blank-size')?.value || '98 × 14 mm (Standard)';
+      const pad = parseFloat(document.getElementById('nesting-padding')?.value || '2');
+      const activeMesh = Viewport.getCurrentMesh?.();
+      activeMesh?.updateMatrixWorld?.(true);
+      const fit = NestingPreview.planLayout?.([geo], blank, { padding: pad, worldMatrices: activeMesh ? [activeMesh.matrixWorld.clone()] : [] });
+      if (fit?.overflow?.length) { setMsg('Toolpath blocked: restoration does not fit the selected blank.', 4500); return; }
+      geo.computeBoundingBox?.();
+      const path = ToolpathPlanner.plan(geo, { margin: pad / 2, worldMatrix: activeMesh?.matrixWorld?.clone?.() });
+      const machine = document.getElementById('toolpath-machine')?.value || 'generic';
+      const job = ManufacturingJob.create({ geometry: geo, caseId: data.caseId, blankKey: blank, padding: pad, supportsAdded: !!geo.userData?.supportsAdded, supportCount: geo.userData?.supportCount || 0, toolpath: path, machine, worldMatrix: activeMesh?.matrixWorld?.clone?.() });
+      const filename = ProjectIO.exportToolpath(path, data.caseId, machine);
+      const jobFile = ProjectIO.exportManufacturingJob(job, data.caseId);
+      setMsg(`Toolpath exported: ${filename} + ${jobFile} — review/post-process before machining`, 6000);
+    } catch (err) { setMsg(`Toolpath error: ${err.message}`, 5000); }
   });
 
   // ═══════════════════════════════════════════════════════════
