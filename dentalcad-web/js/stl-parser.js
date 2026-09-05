@@ -86,7 +86,11 @@ const STLParser = (() => {
         normals.push(nx, ny, nz);
         vCount++;
       }
-      triCount++;
+      if (vCount === 3) triCount++;
+      else {
+        positions.splice(Math.max(0, positions.length - vCount * 3), vCount * 3);
+        normals.splice(Math.max(0, normals.length - vCount * 3), vCount * 3);
+      }
     }
     return {
       positions: new Float32Array(positions),
@@ -119,8 +123,10 @@ const STLParser = (() => {
         for (let i = 1; i < parts.length - 1; i++) {
           for (const token of [parts[0], parts[i], parts[i + 1]]) {
             const idx = token.split('/');
-            const vi  = (parseInt(idx[0]) - 1);
-            const vni = idx[2] ? (parseInt(idx[2]) - 1) : -1;
+            const rawVi = parseInt(idx[0], 10);
+            const vi = rawVi < 0 ? rawVerts.length + rawVi : rawVi - 1;
+            const rawVni = idx[2] ? parseInt(idx[2], 10) : 0;
+            const vni = rawVni < 0 ? rawNormals.length + rawVni : rawVni - 1;
             const v   = rawVerts[vi] || [0, 0, 0];
             positions.push(v[0], v[1], v[2]);
             const n = vni >= 0 ? rawNormals[vni] : null;
@@ -135,6 +141,47 @@ const STLParser = (() => {
       normals:   new Float32Array(normals),
       triCount,
     };
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // PARSE — ASCII PLY (vertices + polygon faces)
+  // ═══════════════════════════════════════════════════════════
+  function _parseASCIIPLY(text) {
+    const lines = text.replace(/\r/g, '').split('\n');
+    if (lines[0].trim().toLowerCase() !== 'ply') throw new Error('Invalid PLY header');
+    let headerEnd = -1, vertexCount = 0, faceCount = 0, element = '';
+    for (let i = 1; i < lines.length; i++) {
+      const parts = lines[i].trim().split(/\s+/);
+      if (parts[0] === 'element') {
+        element = parts[1];
+        if (element === 'vertex') vertexCount = parseInt(parts[2], 10) || 0;
+        if (element === 'face') faceCount = parseInt(parts[2], 10) || 0;
+      }
+      if (parts[0] === 'end_header') { headerEnd = i; break; }
+    }
+    if (headerEnd < 0 || !vertexCount) throw new Error('Invalid PLY header or vertex count');
+    const verts = [];
+    for (let i = 0; i < vertexCount; i++) {
+      const p = lines[headerEnd + 1 + i].trim().split(/\s+/).map(Number);
+      if (p.length < 3 || !p.slice(0, 3).every(Number.isFinite)) throw new Error('Invalid PLY vertex');
+      verts.push([p[0], p[1], p[2]]);
+    }
+    const positions = [], normals = [];
+    for (let i = 0; i < faceCount; i++) {
+      const parts = lines[headerEnd + 1 + vertexCount + i].trim().split(/\s+/).map(Number);
+      const n = parts[0];
+      if (!Number.isInteger(n) || n < 3 || parts.length < n + 1) continue;
+      const ids = parts.slice(1, n + 1);
+      for (let j = 1; j < ids.length - 1; j++) {
+        for (const id of [ids[0], ids[j], ids[j + 1]]) {
+          const v = verts[id];
+          if (!v) throw new Error('PLY face references missing vertex');
+          positions.push(v[0], v[1], v[2]);
+          normals.push(0, 1, 0);
+        }
+      }
+    }
+    return { positions: new Float32Array(positions), normals: new Float32Array(normals), triCount: positions.length / 9 };
   }
 
   // ═══════════════════════════════════════════════════════════
@@ -222,13 +269,22 @@ const STLParser = (() => {
 
           if (name.endsWith('.obj')) {
             parsed = _parseOBJ(new TextDecoder().decode(buffer));
-          } else if (_isBinarySTL(buffer)) {
+          } else if (name.endsWith('.ply')) {
+            parsed = _parseASCIIPLY(new TextDecoder().decode(buffer));
+          } else if (name.endsWith('.stl') && _isBinarySTL(buffer)) {
             parsed = _parseBinarySTL(buffer);
-          } else {
+          } else if (name.endsWith('.stl')) {
             // ASCII STL (also catches binary files that start with "solid")
             parsed = _parseASCIISTL(new TextDecoder().decode(buffer));
+          } else {
+            reject(new Error('Unsupported scan format. Use STL, OBJ, or ASCII PLY.'));
+            return;
           }
 
+          if (!parsed.triCount || !parsed.positions.length) {
+            reject(new Error('Mesh contains no triangles'));
+            return;
+          }
           const result = _buildGeometry(parsed, file.size);
           resolve(result);
         } catch (err) {

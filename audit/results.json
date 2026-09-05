@@ -1,0 +1,158 @@
+[
+  {
+    "name": "Syntax analysis.js",
+    "status": "PASS"
+  },
+  {
+    "name": "Syntax app.js",
+    "status": "PASS"
+  },
+  {
+    "name": "Syntax dental-chart.js",
+    "status": "PASS"
+  },
+  {
+    "name": "Syntax logger.js",
+    "status": "PASS"
+  },
+  {
+    "name": "Syntax manufacturing.js",
+    "status": "PASS"
+  },
+  {
+    "name": "Syntax project-io.js",
+    "status": "PASS"
+  },
+  {
+    "name": "Syntax stl-parser.js",
+    "status": "PASS"
+  },
+  {
+    "name": "Syntax tools.js",
+    "status": "PASS"
+  },
+  {
+    "name": "Syntax undo-redo.js",
+    "status": "PASS"
+  },
+  {
+    "name": "Syntax viewport.js",
+    "status": "PASS"
+  },
+  {
+    "name": "Syntax wizard.js",
+    "status": "PASS"
+  },
+  {
+    "name": "OBJ positive indices",
+    "status": "PASS"
+  },
+  {
+    "name": "OBJ negative indices preserve geometry",
+    "status": "PASS"
+  },
+  {
+    "name": "ASCII PLY import triangulates polygon faces",
+    "status": "PASS"
+  },
+  {
+    "name": "Unsupported scan extension is rejected clearly",
+    "status": "PASS"
+  },
+  {
+    "name": "Empty STL rejected",
+    "status": "PASS"
+  },
+  {
+    "name": "Malformed ASCII STL with incomplete facet rejected",
+    "status": "PASS"
+  },
+  {
+    "name": "Binary STL roundtrip preserves millimeters",
+    "status": "PASS"
+  },
+  {
+    "name": "ASCII PLY export has valid header and vertex count",
+    "status": "PASS"
+  },
+  {
+    "name": "3MF export has model resources and triangle data",
+    "status": "PASS"
+  },
+  {
+    "name": "Undo redo and branch replacement",
+    "status": "PASS"
+  },
+  {
+    "name": "32 tooth library finite coordinates",
+    "status": "PASS"
+  },
+  {
+    "name": "Cement shell follows transformed preparation",
+    "status": "PASS"
+  },
+  {
+    "name": "Small autosave geometry roundtrip",
+    "status": "PASS"
+  },
+  {
+    "name": "Large autosave retains mesh and margin",
+    "status": "PASS"
+  },
+  {
+    "name": "Corrupt project mesh is rejected on load",
+    "status": "PASS"
+  },
+  {
+    "name": "Future project version is rejected on load",
+    "status": "PASS"
+  },
+  {
+    "name": "Corrupt margin line is rejected on load",
+    "status": "PASS"
+  },
+  {
+    "name": "Mesh occlusion detects near contacts",
+    "status": "PASS"
+  },
+  {
+    "name": "Occlusion auto-adapt respects mesh rotation and scale",
+    "status": "PASS"
+  },
+  {
+    "name": "Validator runAllMeshes respects world transforms",
+    "status": "PASS"
+  },
+  {
+    "name": "Support generator computes missing normals before placement",
+    "status": "PASS"
+  },
+  {
+    "name": "Validator welds duplicated STL vertices for manifold check",
+    "status": "PASS"
+  },
+  {
+    "name": "Validator contact index detects full-resolution contact",
+    "status": "PASS"
+  },
+  {
+    "name": "Validator contact index rejects separated meshes",
+    "status": "PASS"
+  },
+  {
+    "name": "Validator marks contact review incomplete without reference mesh",
+    "status": "PASS"
+  },
+  {
+    "name": "Smart margin suggestion respects indexed geometry adjacency",
+    "status": "PASS"
+  },
+  {
+    "name": "Wall thickness computes normals when missing",
+    "status": "PASS"
+  },
+  {
+    "name": "Wall thickness flags open surfaces instead of calling them thick",
+    "status": "PASS"
+  }
+]

@@ -85,14 +85,16 @@ const WallThickness = (() => {
     const minThick  = opts.minThick   ?? thresh.minThick;
     const maxThick  = opts.maxThick   ?? thresh.maxThick;
     const step      = opts.sampleStep ?? 1;
+    const noHitValue = opts.noHitValue ?? 0;
 
     const posAttr  = geo.getAttribute('position');
-    const normAttr = geo.getAttribute('normal');
+    let normAttr = geo.getAttribute('normal');
     const vCount   = posAttr.count;
 
     if (!normAttr) {
       Logger.warn('WallThickness', 'No normals — run computeVertexNormals() first');
       geo.computeVertexNormals();
+      normAttr = geo.getAttribute('normal');
     }
 
     // Build a raycaster mesh from a CLONE of the geometry (never modify live scene geo)
@@ -105,7 +107,7 @@ const WallThickness = (() => {
 
     const colors    = new Float32Array(vCount * 3);
     const thickness = new Float32Array(vCount);
-    let sumT = 0, minT = Infinity, maxT = 0, belowMin = 0;
+    let sumT = 0, minT = Infinity, maxT = 0, belowMin = 0, openSamples = 0;
 
     const origin = new THREE.Vector3();
     const dir    = new THREE.Vector3();
@@ -122,8 +124,9 @@ const WallThickness = (() => {
       raycaster.set(origin, dir);
 
       const hits = raycaster.intersectObject(tempMesh, false);
-      let t = maxThick; // default to max if no hit (open surface)
+      let t = noHitValue;
       if (hits.length > 0) t = Math.min(hits[0].distance, maxThick);
+      else openSamples++;
 
       thickness[i] = t;
       sumT += t;
@@ -164,6 +167,7 @@ const WallThickness = (() => {
         max: +maxT.toFixed(3),
         mean: +mean.toFixed(3),
         pctBelowMin: +pct.toFixed(1),
+        openSamples,
       },
       thresholds: { minThick, maxThick, label: thresh.label },
     };
@@ -190,7 +194,8 @@ const WallThickness = (() => {
 
   /** Map thickness value [0..maxT] to RGB via red→yellow→green */
   function _thickToColor(t, minT, maxT) {
-    const norm = Math.max(0, Math.min(1, (t - minT) / (maxT - minT)));
+    const range = Math.max(maxT - minT, 1e-9);
+    const norm = Math.max(0, Math.min(1, (t - minT) / range));
     // 0 = red, 0.5 = yellow, 1 = green
     if (norm < 0.5) {
       return { r: 1, g: norm * 2, b: 0 };      // red → yellow
@@ -790,7 +795,7 @@ const Validator = (() => {
 
     // ── Check 5: Contact points (if prep geometry provided) ─
     if (prepGeo) {
-      const cpResult = _checkContactPoints(restorationGeo, prepGeo, contactThresh);
+      const cpResult = _checkContactPoints(restorationGeo, prepGeo, contactThresh, rules.restorationMatrix, rules.prepMatrix);
       results.push({
         id: 'contacts_ok',
         label: 'Proximal contacts within tolerance',
@@ -804,9 +809,9 @@ const Validator = (() => {
       results.push({
         id: 'contacts_ok',
         label: 'Proximal contacts (no reference mesh)',
-        pass:  true,
+        pass:  false,
         value: 0,
-        message: 'Load opposing arch for contact analysis',
+        message: 'Incomplete — load opposing arch for contact analysis',
       });
     }
 
@@ -826,12 +831,24 @@ const Validator = (() => {
     return results;
   }
 
+  function runAllMeshes(restorationMesh, prepMesh = null, rules = {}) {
+    return runAll(restorationMesh?.geometry || null, prepMesh?.geometry || null, {
+      ...rules,
+      restorationMatrix: restorationMesh?.matrixWorld || null,
+      prepMatrix: prepMesh?.matrixWorld || null,
+    });
+  }
+
   function _checkManifold(posAttr) {
-    // Count edge occurrences: each edge (sorted v pair) should appear exactly 2x
+    // Weld duplicated STL corners before counting edge occurrences.
+    const vertexKeys = new Array(posAttr.count);
+    const q = v => Math.round(v * 1e5);
+    for (let i = 0; i < posAttr.count; i++) vertexKeys[i] = `${q(posAttr.getX(i))}:${q(posAttr.getY(i))}:${q(posAttr.getZ(i))}`;
     const edgeMap = new Map();
     for (let i = 0; i < posAttr.count; i += 3) {
       for (const [a, b] of [[i,i+1],[i+1,i+2],[i+2,i]]) {
-        const key = a < b ? `${a}_${b}` : `${b}_${a}`;
+        const ka = vertexKeys[a], kb = vertexKeys[b];
+        const key = ka < kb ? `${ka}|${kb}` : `${kb}|${ka}`;
         edgeMap.set(key, (edgeMap.get(key) ?? 0) + 1);
       }
     }
@@ -842,21 +859,38 @@ const Validator = (() => {
     return { pass: openEdges === 0, openEdges };
   }
 
-  function _checkContactPoints(geoA, geoB, threshold) {
-    // Simplified: find minimum distance between vertex clouds
+  function _checkContactPoints(geoA, geoB, threshold, matrixA = null, matrixB = null) {
+    // Spatially indexed full-resolution vertex-cloud distance.
     const posA = geoA.getAttribute('position');
     const posB = geoB.getAttribute('position');
+    const cellSize = Math.max(threshold, 1e-4);
+    const key = (x,y,z) => `${Math.floor(x/cellSize)}:${Math.floor(y/cellSize)}:${Math.floor(z/cellSize)}`;
+    const buckets = new Map();
+    const pointB = new THREE.Vector3();
+    for (let j = 0; j < posB.count; j++) {
+      pointB.set(posB.getX(j),posB.getY(j),posB.getZ(j));
+      if (matrixB) pointB.applyMatrix4(matrixB);
+      const k = key(pointB.x, pointB.y, pointB.z);
+      const list = buckets.get(k); if (list) list.push(j); else buckets.set(k,[j]);
+    }
     let minDist = Infinity;
     let contactCount = 0;
-    const step = Math.max(1, Math.floor(posA.count / 200)); // sample 200 pts max
-
-    for (let i = 0; i < posA.count; i += step) {
-      const ax = posA.getX(i), ay = posA.getY(i), az = posA.getZ(i);
-      for (let j = 0; j < posB.count; j += step) {
-        const dx = ax - posB.getX(j);
-        const dy = ay - posB.getY(j);
-        const dz = az - posB.getZ(j);
+    let distanceChecks = 0;
+    const worldA = new THREE.Vector3(), worldB = new THREE.Vector3();
+    for (let i = 0; i < posA.count; i++) {
+      worldA.set(posA.getX(i),posA.getY(i),posA.getZ(i));
+      if (matrixA) worldA.applyMatrix4(matrixA);
+      const ax = worldA.x, ay = worldA.y, az = worldA.z;
+      const cx=Math.floor(ax/cellSize),cy=Math.floor(ay/cellSize),cz=Math.floor(az/cellSize), candidates=[];
+      for(let dx=-1;dx<=1;dx++)for(let dy=-1;dy<=1;dy++)for(let dz=-1;dz<=1;dz++){const list=buckets.get(`${cx+dx}:${cy+dy}:${cz+dz}`);if(list)candidates.push(...list);}
+      for (const j of candidates) {
+        worldB.set(posB.getX(j),posB.getY(j),posB.getZ(j));
+        if (matrixB) worldB.applyMatrix4(matrixB);
+        const dx = ax - worldB.x;
+        const dy = ay - worldB.y;
+        const dz = az - worldB.z;
         const d  = Math.sqrt(dx*dx + dy*dy + dz*dz);
+        distanceChecks++;
         if (d < minDist) minDist = d;
         if (d <= threshold) contactCount++;
       }
@@ -865,6 +899,7 @@ const Validator = (() => {
       pass: minDist <= threshold + 0.1,
       maxGap: minDist,
       contactCount,
+      distanceChecks,
     };
   }
 
@@ -877,7 +912,7 @@ const Validator = (() => {
     return { x: cx/n, y: cy/n, z: cz/n };
   }
 
-  return { runAll };
+  return { runAll, runAllMeshes };
 })();
 
 
@@ -1485,6 +1520,9 @@ class CrownGeneratorEngine {
 
     this._cementShell      = new THREE.Mesh(geo, mat);
     this._cementShell.name = 'CementGapShell';
+    this._cementShell.position.copy(prepToothMesh.position);
+    this._cementShell.quaternion.copy(prepToothMesh.quaternion);
+    this._cementShell.scale.copy(prepToothMesh.scale);
     this._cementShell.renderOrder = 1;
     this.scene.add(this._cementShell);
 
@@ -1648,6 +1686,28 @@ class OcclusionHeatmapEngine {
   setOpposingPlane(y)         { this._material.uniforms.uOpposingY.value   = y; }
   setMaxDistance(mm)          { this._material.uniforms.uMaxDistance.value  = mm; }
 
+  analyzeMeshOcclusion(crownMesh, opposingMesh, opts = {}) {
+    if (!crownMesh?.geometry || !opposingMesh?.geometry) return { distances: [], contacts: 0, collisions: 0, minDistance: Infinity, maxDistance: 0 };
+    crownMesh.updateMatrixWorld(true); opposingMesh.updateMatrixWorld(true);
+    const cp=crownMesh.geometry.getAttribute('position'), op=opposingMesh.geometry.getAttribute('position');
+    if (!cp || !op || !cp.count || !op.count) return { distances: [], contacts: 0, collisions: 0, minDistance: Infinity, maxDistance: 0 };
+    const opposing=[], p=new THREE.Vector3();
+    for(let j=0;j<op.count;j++){p.set(op.getX(j),op.getY(j),op.getZ(j)).applyMatrix4(opposingMesh.matrixWorld);opposing.push(p.clone());}
+    const contactMM=opts.contactMM??.05, clearanceMM=opts.clearanceMM??.02, cellSize=Math.max(opts.indexCellSize??Math.max(contactMM*4,.25),1e-4);
+    const cellKey=(x,y,z)=>`${Math.floor(x/cellSize)}:${Math.floor(y/cellSize)}:${Math.floor(z/cellSize)}`, buckets=new Map();
+    opposing.forEach(q=>{const k=cellKey(q.x,q.y,q.z),list=buckets.get(k);if(list)list.push(q);else buckets.set(k,[q]);});
+    const distances=new Float32Array(cp.count), world=new THREE.Vector3(); let contacts=0,collisions=0,minDistance=Infinity,maxDistance=0,distanceChecks=0;
+    for(let i=0;i<cp.count;i++){
+      world.set(cp.getX(i),cp.getY(i),cp.getZ(i)).applyMatrix4(crownMesh.matrixWorld);
+      const cx=Math.floor(world.x/cellSize),cy=Math.floor(world.y/cellSize),cz=Math.floor(world.z/cellSize), candidates=[];
+      for(let dx=-1;dx<=1;dx++)for(let dy=-1;dy<=1;dy++)for(let dz=-1;dz<=1;dz++){const list=buckets.get(`${cx+dx}:${cy+dy}:${cz+dz}`);if(list)candidates.push(...list);}
+      const search=candidates.length?candidates:opposing; let best=Infinity;
+      for(const q of search){best=Math.min(best,world.distanceTo(q));distanceChecks++;}
+      distances[i]=best; minDistance=Math.min(minDistance,best); maxDistance=Math.max(maxDistance,best); if(best<=contactMM)contacts++; if(best<clearanceMM)collisions++;
+    }
+    return {distances,contacts,collisions,minDistance,maxDistance,contactMM,clearanceMM,distanceChecks,indexed:true};
+  }
+
   // ── Auto-trim high-spots ──────────────────────────────────
   /**
    * Clamps any vertex above `opposingY` down to
@@ -1662,14 +1722,18 @@ class OcclusionHeatmapEngine {
 
     const geom      = crownMesh.geometry;
     const pos       = geom.getAttribute('position');
+    crownMesh.updateMatrixWorld(true);
+    const invWorld  = crownMesh.matrixWorld.clone().invert();
+    const world     = new THREE.Vector3();
     const clearance = clearanceMM;   // already in scene units (vpScale applied by caller)
     let   trimmed   = 0;
 
     for (let i = 0; i < pos.count; i++) {
-      // Convert local Y → world Y
-      const worldY = pos.getY(i) + crownMesh.position.y;
-      if (worldY > opposingY) {
-        pos.setY(i, (opposingY - clearance) - crownMesh.position.y);
+      world.set(pos.getX(i), pos.getY(i), pos.getZ(i)).applyMatrix4(crownMesh.matrixWorld);
+      if (world.y > opposingY) {
+        world.y = opposingY - clearance;
+        world.applyMatrix4(invWorld);
+        pos.setXYZ(i, world.x, world.y, world.z);
         trimmed++;
       }
     }
@@ -1750,7 +1814,7 @@ const SmartSuggestions = (() => {
     if (vCount < 30) return _emptyResult();
 
     // ── Step 1: Base curvature (same as MarginDetector) ──────
-    const adj = _buildAdjMap(pos, vCount);
+    const adj = _buildAdjMap(pos, vCount, geo.index);
     const curv = _computeCurvature(pos, vCount, adj);
 
     // ── Step 2: Edge proximity score ─────────────────────────
@@ -1843,11 +1907,12 @@ const SmartSuggestions = (() => {
     };
   }
 
-  function _buildAdjMap(posAttr, vCount) {
+  function _buildAdjMap(posAttr, vCount, indexAttr = null) {
     const adj = new Array(vCount).fill(null).map(() => new Set());
-    for (let i = 0; i < vCount; i += 3) {
-      const a = i, b = i + 1, c = i + 2;
-      if (c < vCount) {
+    const triCount = indexAttr ? indexAttr.count : vCount;
+    for (let i = 0; i < triCount; i += 3) {
+      const a = indexAttr ? indexAttr.getX(i) : i, b = indexAttr ? indexAttr.getX(i + 1) : i + 1, c = indexAttr ? indexAttr.getX(i + 2) : i + 2;
+      if (c < vCount && b < vCount) {
         adj[a].add(b); adj[a].add(c);
         adj[b].add(a); adj[b].add(c);
         adj[c].add(a); adj[c].add(b);

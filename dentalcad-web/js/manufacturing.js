@@ -332,8 +332,11 @@ const SupportGenerator = (() => {
 
     // Collect overhanging vertex positions
     const pos  = geo.getAttribute('position');
-    const norm = geo.getAttribute('normal');
-    if (!norm) { geo.computeVertexNormals(); }
+    let norm = geo.getAttribute('normal');
+    if (!norm) {
+      geo.computeVertexNormals();
+      norm = geo.getAttribute('normal');
+    }
 
     // Use a grid to avoid duplicate supports
     const grid     = new Map();

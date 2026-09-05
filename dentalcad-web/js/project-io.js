@@ -87,6 +87,12 @@ const ProjectIO = (() => {
 
   function _deserializeMesh(snap) {
     if (!snap || !snap.positions?.length) return null;
+    if (!Array.isArray(snap.positions) || snap.positions.length % 3 !== 0 || !snap.positions.every(Number.isFinite)) {
+      throw new Error('Invalid mesh positions in project file');
+    }
+    if (snap.normals?.length && (!Array.isArray(snap.normals) || !snap.normals.every(Number.isFinite))) {
+      throw new Error('Invalid mesh normals in project file');
+    }
     const posArr = new Float32Array(snap.positions);
     const geo    = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(posArr, 3));
@@ -115,10 +121,23 @@ const ProjectIO = (() => {
 
   // ── Parse / restore ───────────────────────────────────────
   function _parseProject(project) {
-    if (!project?.caseData) throw new Error('Missing caseData');
+    if (!project?.caseData || typeof project.caseData !== 'object' || Array.isArray(project.caseData)) {
+      throw new Error('Missing or invalid caseData');
+    }
+    if (project.version != null) {
+      const major = Number.parseInt(String(project.version).split('.')[0], 10);
+      const supportedMajor = Number.parseInt(FORMAT_VERSION.split('.')[0], 10);
+      if (!Number.isFinite(major) || major > supportedMajor) {
+        throw new Error(`Unsupported project version: ${project.version}`);
+      }
+    }
     const geometry       = _deserializeMesh(project.meshSnapshot);
     const stats          = project.meshSnapshot?.stats || null;
-    const marginLine     = project.marginLine?.points?.length ? project.marginLine.points : null;
+    const rawMargin      = project.marginLine?.points;
+    if (rawMargin != null && (!Array.isArray(rawMargin) || !rawMargin.every(p => p && Number.isFinite(p.x) && Number.isFinite(p.y) && Number.isFinite(p.z)))) {
+      throw new Error('Invalid margin line in project file');
+    }
+    const marginLine     = rawMargin?.length ? rawMargin : null;
     const marginLineClosed = project.marginLine?.closed ?? false;
     markClean();
     return {
@@ -188,20 +207,20 @@ const ProjectIO = (() => {
           caseId:   caseData.caseId  || '',
           data:     project,          // full project object
         });
-        return; // success — no localStorage needed
+        return true; // success — no localStorage needed
       }
     } catch (err) {
       console.warn('IndexedDB autoSave failed:', err.message);
     }
-    // Fallback: localStorage (trim mesh if too large)
+    // Fallback: localStorage. Keep the full payload so recovery cannot
+    // silently restore a case without its mesh.
     try {
-      let payload = project;
-      const json  = JSON.stringify(payload);
-      if (json.length > 2_500_000) {
-        payload = _buildProject(caseData, null, {});
-      }
-      localStorage.setItem(LS_FALLBACK_KEY, JSON.stringify(payload));
-    } catch (_) {}
+      localStorage.setItem(LS_FALLBACK_KEY, JSON.stringify(project));
+      return true;
+    } catch (err) {
+      console.warn('AutoSave unavailable: could not persist the full case.', err.message);
+      return false;
+    }
   }
 
   async function loadAutoSave() {

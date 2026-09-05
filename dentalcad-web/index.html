@@ -3,22 +3,12 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>DentalCAD — Professional Dental Design System</title>
-<meta name="description" content="DentalCAD — Professional dental CAD/CAM design system. Crown, bridge, veneer, implant design powered by advanced 3D technology."/>
-<meta name="theme-color" content="#111318"/>
-<meta name="mobile-web-app-capable" content="yes"/>
-<meta name="apple-mobile-web-app-capable" content="yes"/>
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
-<meta name="apple-mobile-web-app-title" content="DentalCAD"/>
-<link rel="manifest" href="manifest.json"/>
-<link rel="icon" href="icons/icon.svg" type="image/svg+xml"/>
-<link rel="apple-touch-icon" href="icons/icon.svg"/>
-<link rel="preconnect" href="https://fonts.googleapis.com"/>
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<title>DentalCAD — Dental Design System</title>
 <link rel="stylesheet" href="css/style.css"/>
 </head>
 <body>
+
+
 
 
 <!-- ════════════════════════════════════════════════════════════
@@ -413,9 +403,9 @@
             <div id="drop-zone">
               <div class="drop-icon">📂</div>
               <div class="drop-title">Drop scan file here</div>
-              <div class="drop-sub">Supported: .stl &nbsp; .obj &nbsp; .ply &nbsp; .3oxz &nbsp; .dcm</div>
+              <div class="drop-sub">Supported: .stl &nbsp; .obj &nbsp; .ply (ASCII)</div>
             </div>
-            <input id="scan-file-input" type="file" accept=".stl,.obj,.ply,.3oxz,.dcm" style="display:none" />
+            <input id="scan-file-input" type="file" accept=".stl,.obj,.ply" style="display:none" />
 
             <div class="flex-row mt-8">
               <button id="btn-browse-scan" class="btn btn-primary">📁 Browse File…</button>

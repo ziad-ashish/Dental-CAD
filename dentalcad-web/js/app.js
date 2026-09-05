@@ -459,11 +459,21 @@ document.addEventListener('DOMContentLoaded', () => {
       case 'exit':          if (confirm('Close DentalCAD?')) window.close(); break;
       case 'undo':          _doUndo();           break;
       case 'redo':          _doRedo();           break;
+      case 'mirror':        _mirrorCurrentMesh(); break;
+      case 'reset-library': _resetToSelectedLibrary(); break;
+      case 'view-front':    Viewport.setView('front'); break;
+      case 'view-top':      Viewport.setView('top');   break;
+      case 'view-side':     Viewport.setView('side');  break;
       case 'toggle-grid':   gridBtn.click();     break;
       case 'toggle-wire':   wireBtn.click();     break;
       case 'toggle-left':   document.getElementById('left-dock').classList.toggle('hidden');  break;
       case 'toggle-right':  document.getElementById('right-dock').classList.toggle('hidden'); break;
       case 'modules':       openModal('modules-modal'); break;
+      case 'mod-crown':     openModal('modules-modal'); setMsg('Crown & Bridge module selected.'); break;
+      case 'mod-implant':   openModal('modules-modal'); setMsg('Implant module selected.'); break;
+      case 'mod-denture':   openModal('modules-modal'); setMsg('Full Denture module selected.'); break;
+      case 'mod-model':     openModal('modules-modal'); setMsg('Model Creator module selected.'); break;
+      case 'mod-guide':     openModal('modules-modal'); setMsg('Surgical Guide module selected.'); break;
       case 'shortcuts':     openModal('shortcuts-modal'); break;
       case 'about':         openModal('about-modal'); break;
       case 'margin-line':   activateTool('Margin Line'); break;
@@ -473,6 +483,22 @@ document.addEventListener('DOMContentLoaded', () => {
       case 'folder-watch':  openModal('folder-watch-modal'); break;
       default: setMsg(`${action} (placeholder)`);
     }
+  }
+
+  function _mirrorCurrentMesh() {
+    const geo = Viewport.getCurrentGeometry?.(), attr = geo?.getAttribute('position');
+    if (!attr) { setMsg('Load a design before mirroring.', 2500); return; }
+    const before = new Float32Array(attr.array), after = new Float32Array(before);
+    for (let i = 0; i < after.length; i += 3) after[i] = -after[i];
+    const apply = values => { attr.array.set(values); attr.needsUpdate = true; geo.computeVertexNormals(); Viewport.render?.(); };
+    UndoRedo.push(new UndoRedo.MeshStateCommand('Mirror design', before, after, apply));
+    ProjectIO.markDirty(); _scheduleAutoSave(); setMsg('Design mirrored across the midline.');
+  }
+
+  function _resetToSelectedLibrary() {
+    const card = document.querySelector('#lib-step-grid .lib-card.selected') || document.querySelector('.lib-thumb.selected');
+    if (!card) { setMsg('Select a tooth library shape first.', 2500); return; }
+    _loadLibraryShape(card);
   }
 
   // ═══════════════════════════════════════════════════════════
@@ -1235,7 +1261,7 @@ document.addEventListener('DOMContentLoaded', () => {
       dz.querySelector('.drop-icon').textContent  = '📂';
       dz.querySelector('.drop-title').textContent = 'Drop scan file here';
       dz.querySelector('.drop-title').style.color = '';
-      dz.querySelector('.drop-sub').textContent   = 'Supported: .stl  .obj  .ply  .3oxz  .dcm';
+      dz.querySelector('.drop-sub').textContent   = 'Supported: .stl  .obj  .ply (ASCII)';
     }
     document.getElementById('scan-info-card')?.classList.add('hidden');
     document.getElementById('scan-status').textContent = '';
@@ -1645,7 +1671,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const matSel   = document.querySelector('#props-panel .form-select');
     const material = matSel?.value || 'Zirconia (3Y-TZP)';
     const thresh   = WallThickness.getThresholds(material);
-    const results  = Validator.runAll(geo, null, {
+    const results  = Validator.runAllMeshes(Viewport.getCurrentMesh?.(), _opposingMesh, {
       material,
       minThickness: thresh.minThick,
       maxThickness: thresh.maxThick,
@@ -2236,6 +2262,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const pos    = mesh.geometry.getAttribute('position');
     const colors = mesh.geometry.getAttribute('color');
+    _initEngines();
 
     // Build colour attribute if not present
     let colorAttr = colors;
@@ -2246,17 +2273,22 @@ document.addEventListener('DOMContentLoaded', () => {
       if (mat) { mat.vertexColors = true; mat.needsUpdate = true; }
     }
 
-    // Determine reference Y from opposing mesh or occ-opposing-y slider
+    const meshReport = _opposingMesh && _occlusionEngine
+      ? _occlusionEngine.analyzeMeshOcclusion(mesh, _opposingMesh, {
+          contactMM: CONTACT_THRESH,
+          clearanceMM: parseFloat(document.getElementById('occ-clearance')?.value ?? 0.02),
+        }) : null;
     const oppY = _opposingMesh
-      ? _opposingMesh.position.y + _opposingMesh.geometry.boundingBox?.min?.y ?? 0
+      ? ((_opposingMesh.geometry.boundingBox || _opposingMesh.geometry.computeBoundingBox(), _opposingMesh.position.y + (_opposingMesh.geometry.boundingBox?.min?.y ?? 0)))
       : parseFloat(document.getElementById('occ-opposing-y')?.value ?? 2.5);
 
     let contactCount = 0;
     const grid = new Map();
 
     for (let i = 0; i < pos.count; i++) {
-      const wy   = pos.getY(i) + mesh.position.y;
-      const dist = Math.abs(wy - oppY);
+      const worldPoint = new THREE.Vector3(pos.getX(i), pos.getY(i), pos.getZ(i)).applyMatrix4(mesh.matrixWorld);
+      const wy   = worldPoint.y;
+      const dist = meshReport ? meshReport.distances[i] : Math.abs(wy - oppY);
 
       if (dist < CONTACT_THRESH) {
         // Colour vertex: red = collision, orange = near contact
@@ -2268,8 +2300,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const key = `${gx}_${gz}`;
         if (!grid.has(key)) {
           grid.set(key, new THREE.Vector3(
-            pos.getX(i) + mesh.position.x, wy,
-            pos.getZ(i) + mesh.position.z
+            worldPoint.x, worldPoint.y, worldPoint.z
           ));
         }
         contactCount++;

@@ -1,4 +1,15 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/><meta http-equiv="Cache-Control" content="no-cache,no-store,must-revalidate"/><meta name="theme-color" content="#111318"/><meta name="mobile-web-app-capable" content="yes"/><meta name="apple-mobile-web-app-capable" content="yes"/><meta name="apple-mobile-web-app-title" content="DentalCAD"/><link rel="manifest" href="manifest.json"/><link rel="icon" href="icons/icon.svg" type="image/svg+xml"/><title>DentalCAD v3</title><link rel="preconnect" href="https://fonts.googleapis.com"/><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/><link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/><style>/* ============================================================
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>DentalCAD — Dental Design System</title>
+<style>
+
+
+
+
+/* ============================================================
    DentalCAD Web — Complete UI Redesign v2.0
    Modern Dark Theme · Glassmorphism · Fluid Animations
    ============================================================ */
@@ -2653,7 +2664,18 @@ html, body {
 }
 .lib-thumb:hover .lib-thumb-name { color: var(--text-muted); }
 .lib-thumb.selected .lib-thumb-name { color: var(--accent-light); font-weight: 600; }
-</style></head><body>
+
+
+
+
+
+</style>
+</head>
+<body>
+
+
+
+
 <!-- ════════════════════════════════════════════════════════════
      SPLASH SCREEN
 ═════════════════════════════════════════════════════════════ -->
@@ -3046,9 +3068,9 @@ html, body {
             <div id="drop-zone">
               <div class="drop-icon">📂</div>
               <div class="drop-title">Drop scan file here</div>
-              <div class="drop-sub">Supported: .stl &nbsp; .obj &nbsp; .ply &nbsp; .3oxz &nbsp; .dcm</div>
+              <div class="drop-sub">Supported: .stl &nbsp; .obj &nbsp; .ply (ASCII)</div>
             </div>
-            <input id="scan-file-input" type="file" accept=".stl,.obj,.ply,.3oxz,.dcm" style="display:none" />
+            <input id="scan-file-input" type="file" accept=".stl,.obj,.ply" style="display:none" />
 
             <div class="flex-row mt-8">
               <button id="btn-browse-scan" class="btn btn-primary">📁 Browse File…</button>
@@ -4534,10 +4556,9 @@ html, body {
     </div>
   </div>
 </div>
-
-<!-- â”€â”€ Scripts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script><script>
-/* === stl-parser === */
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// === stl-parser.js ===
 // ═══════════════════════════════════════════════════════════
 // stl-parser.js
 // ═══════════════════════════════════════════════════════════
@@ -4626,7 +4647,11 @@ const STLParser = (() => {
         normals.push(nx, ny, nz);
         vCount++;
       }
-      triCount++;
+      if (vCount === 3) triCount++;
+      else {
+        positions.splice(Math.max(0, positions.length - vCount * 3), vCount * 3);
+        normals.splice(Math.max(0, normals.length - vCount * 3), vCount * 3);
+      }
     }
     return {
       positions: new Float32Array(positions),
@@ -4659,8 +4684,10 @@ const STLParser = (() => {
         for (let i = 1; i < parts.length - 1; i++) {
           for (const token of [parts[0], parts[i], parts[i + 1]]) {
             const idx = token.split('/');
-            const vi  = (parseInt(idx[0]) - 1);
-            const vni = idx[2] ? (parseInt(idx[2]) - 1) : -1;
+            const rawVi = parseInt(idx[0], 10);
+            const vi = rawVi < 0 ? rawVerts.length + rawVi : rawVi - 1;
+            const rawVni = idx[2] ? parseInt(idx[2], 10) : 0;
+            const vni = rawVni < 0 ? rawNormals.length + rawVni : rawVni - 1;
             const v   = rawVerts[vi] || [0, 0, 0];
             positions.push(v[0], v[1], v[2]);
             const n = vni >= 0 ? rawNormals[vni] : null;
@@ -4675,6 +4702,47 @@ const STLParser = (() => {
       normals:   new Float32Array(normals),
       triCount,
     };
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // PARSE — ASCII PLY (vertices + polygon faces)
+  // ═══════════════════════════════════════════════════════════
+  function _parseASCIIPLY(text) {
+    const lines = text.replace(/\r/g, '').split('\n');
+    if (lines[0].trim().toLowerCase() !== 'ply') throw new Error('Invalid PLY header');
+    let headerEnd = -1, vertexCount = 0, faceCount = 0, element = '';
+    for (let i = 1; i < lines.length; i++) {
+      const parts = lines[i].trim().split(/\s+/);
+      if (parts[0] === 'element') {
+        element = parts[1];
+        if (element === 'vertex') vertexCount = parseInt(parts[2], 10) || 0;
+        if (element === 'face') faceCount = parseInt(parts[2], 10) || 0;
+      }
+      if (parts[0] === 'end_header') { headerEnd = i; break; }
+    }
+    if (headerEnd < 0 || !vertexCount) throw new Error('Invalid PLY header or vertex count');
+    const verts = [];
+    for (let i = 0; i < vertexCount; i++) {
+      const p = lines[headerEnd + 1 + i].trim().split(/\s+/).map(Number);
+      if (p.length < 3 || !p.slice(0, 3).every(Number.isFinite)) throw new Error('Invalid PLY vertex');
+      verts.push([p[0], p[1], p[2]]);
+    }
+    const positions = [], normals = [];
+    for (let i = 0; i < faceCount; i++) {
+      const parts = lines[headerEnd + 1 + vertexCount + i].trim().split(/\s+/).map(Number);
+      const n = parts[0];
+      if (!Number.isInteger(n) || n < 3 || parts.length < n + 1) continue;
+      const ids = parts.slice(1, n + 1);
+      for (let j = 1; j < ids.length - 1; j++) {
+        for (const id of [ids[0], ids[j], ids[j + 1]]) {
+          const v = verts[id];
+          if (!v) throw new Error('PLY face references missing vertex');
+          positions.push(v[0], v[1], v[2]);
+          normals.push(0, 1, 0);
+        }
+      }
+    }
+    return { positions: new Float32Array(positions), normals: new Float32Array(normals), triCount: positions.length / 9 };
   }
 
   // ═══════════════════════════════════════════════════════════
@@ -4762,13 +4830,22 @@ const STLParser = (() => {
 
           if (name.endsWith('.obj')) {
             parsed = _parseOBJ(new TextDecoder().decode(buffer));
-          } else if (_isBinarySTL(buffer)) {
+          } else if (name.endsWith('.ply')) {
+            parsed = _parseASCIIPLY(new TextDecoder().decode(buffer));
+          } else if (name.endsWith('.stl') && _isBinarySTL(buffer)) {
             parsed = _parseBinarySTL(buffer);
-          } else {
+          } else if (name.endsWith('.stl')) {
             // ASCII STL (also catches binary files that start with "solid")
             parsed = _parseASCIISTL(new TextDecoder().decode(buffer));
+          } else {
+            reject(new Error('Unsupported scan format. Use STL, OBJ, or ASCII PLY.'));
+            return;
           }
 
+          if (!parsed.triCount || !parsed.positions.length) {
+            reject(new Error('Mesh contains no triangles'));
+            return;
+          }
           const result = _buildGeometry(parsed, file.size);
           resolve(result);
         } catch (err) {
@@ -5155,7 +5232,8 @@ const STLParser = (() => {
     formatBytes,
   };
 })();
-/* === project-io === */
+
+// === project-io.js ===
 /**
  * project-io.js  — v3  (IndexedDB backend via inline Dexie.js)
  *
@@ -5245,6 +5323,12 @@ const ProjectIO = (() => {
 
   function _deserializeMesh(snap) {
     if (!snap || !snap.positions?.length) return null;
+    if (!Array.isArray(snap.positions) || snap.positions.length % 3 !== 0 || !snap.positions.every(Number.isFinite)) {
+      throw new Error('Invalid mesh positions in project file');
+    }
+    if (snap.normals?.length && (!Array.isArray(snap.normals) || !snap.normals.every(Number.isFinite))) {
+      throw new Error('Invalid mesh normals in project file');
+    }
     const posArr = new Float32Array(snap.positions);
     const geo    = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(posArr, 3));
@@ -5273,10 +5357,23 @@ const ProjectIO = (() => {
 
   // ── Parse / restore ───────────────────────────────────────
   function _parseProject(project) {
-    if (!project?.caseData) throw new Error('Missing caseData');
+    if (!project?.caseData || typeof project.caseData !== 'object' || Array.isArray(project.caseData)) {
+      throw new Error('Missing or invalid caseData');
+    }
+    if (project.version != null) {
+      const major = Number.parseInt(String(project.version).split('.')[0], 10);
+      const supportedMajor = Number.parseInt(FORMAT_VERSION.split('.')[0], 10);
+      if (!Number.isFinite(major) || major > supportedMajor) {
+        throw new Error(`Unsupported project version: ${project.version}`);
+      }
+    }
     const geometry       = _deserializeMesh(project.meshSnapshot);
     const stats          = project.meshSnapshot?.stats || null;
-    const marginLine     = project.marginLine?.points?.length ? project.marginLine.points : null;
+    const rawMargin      = project.marginLine?.points;
+    if (rawMargin != null && (!Array.isArray(rawMargin) || !rawMargin.every(p => p && Number.isFinite(p.x) && Number.isFinite(p.y) && Number.isFinite(p.z)))) {
+      throw new Error('Invalid margin line in project file');
+    }
+    const marginLine     = rawMargin?.length ? rawMargin : null;
     const marginLineClosed = project.marginLine?.closed ?? false;
     markClean();
     return {
@@ -5346,20 +5443,20 @@ const ProjectIO = (() => {
           caseId:   caseData.caseId  || '',
           data:     project,          // full project object
         });
-        return; // success — no localStorage needed
+        return true; // success — no localStorage needed
       }
     } catch (err) {
       console.warn('IndexedDB autoSave failed:', err.message);
     }
-    // Fallback: localStorage (trim mesh if too large)
+    // Fallback: localStorage. Keep the full payload so recovery cannot
+    // silently restore a case without its mesh.
     try {
-      let payload = project;
-      const json  = JSON.stringify(payload);
-      if (json.length > 2_500_000) {
-        payload = _buildProject(caseData, null, {});
-      }
-      localStorage.setItem(LS_FALLBACK_KEY, JSON.stringify(payload));
-    } catch (_) {}
+      localStorage.setItem(LS_FALLBACK_KEY, JSON.stringify(project));
+      return true;
+    } catch (err) {
+      console.warn('AutoSave unavailable: could not persist the full case.', err.message);
+      return false;
+    }
   }
 
   async function loadAutoSave() {
@@ -5519,7 +5616,7 @@ const ProjectIO = (() => {
   };
 })();
 
-/* === undo-redo === */
+// === undo-redo.js ===
 /**
  * undo-redo.js
  * Generic command stack for mesh operations.
@@ -5663,7 +5760,7 @@ const UndoRedo = (() => {
     MarginPointCommand,
   };
 })();
-/* === logger === */
+// === logger.js ===
 /**
  * logger.js — Centralised logging + error boundaries for DentalCAD
  *
@@ -5828,8 +5925,7 @@ const Logger = (() => {
 
   return { init, debug, info, warn, error, guard, downloadLogs, setLevel, getBuffer };
 })();
-
-/* === analysis === */
+// === analysis.js ===
 /**
  * analysis.js — Mesh analysis modules for DentalCAD
  *
@@ -5917,14 +6013,16 @@ const WallThickness = (() => {
     const minThick  = opts.minThick   ?? thresh.minThick;
     const maxThick  = opts.maxThick   ?? thresh.maxThick;
     const step      = opts.sampleStep ?? 1;
+    const noHitValue = opts.noHitValue ?? 0;
 
     const posAttr  = geo.getAttribute('position');
-    const normAttr = geo.getAttribute('normal');
+    let normAttr = geo.getAttribute('normal');
     const vCount   = posAttr.count;
 
     if (!normAttr) {
       Logger.warn('WallThickness', 'No normals — run computeVertexNormals() first');
       geo.computeVertexNormals();
+      normAttr = geo.getAttribute('normal');
     }
 
     // Build a raycaster mesh from a CLONE of the geometry (never modify live scene geo)
@@ -5937,7 +6035,7 @@ const WallThickness = (() => {
 
     const colors    = new Float32Array(vCount * 3);
     const thickness = new Float32Array(vCount);
-    let sumT = 0, minT = Infinity, maxT = 0, belowMin = 0;
+    let sumT = 0, minT = Infinity, maxT = 0, belowMin = 0, openSamples = 0;
 
     const origin = new THREE.Vector3();
     const dir    = new THREE.Vector3();
@@ -5954,8 +6052,9 @@ const WallThickness = (() => {
       raycaster.set(origin, dir);
 
       const hits = raycaster.intersectObject(tempMesh, false);
-      let t = maxThick; // default to max if no hit (open surface)
+      let t = noHitValue;
       if (hits.length > 0) t = Math.min(hits[0].distance, maxThick);
+      else openSamples++;
 
       thickness[i] = t;
       sumT += t;
@@ -5996,6 +6095,7 @@ const WallThickness = (() => {
         max: +maxT.toFixed(3),
         mean: +mean.toFixed(3),
         pctBelowMin: +pct.toFixed(1),
+        openSamples,
       },
       thresholds: { minThick, maxThick, label: thresh.label },
     };
@@ -6022,7 +6122,8 @@ const WallThickness = (() => {
 
   /** Map thickness value [0..maxT] to RGB via red→yellow→green */
   function _thickToColor(t, minT, maxT) {
-    const norm = Math.max(0, Math.min(1, (t - minT) / (maxT - minT)));
+    const range = Math.max(maxT - minT, 1e-9);
+    const norm = Math.max(0, Math.min(1, (t - minT) / range));
     // 0 = red, 0.5 = yellow, 1 = green
     if (norm < 0.5) {
       return { r: 1, g: norm * 2, b: 0 };      // red → yellow
@@ -6622,7 +6723,7 @@ const Validator = (() => {
 
     // ── Check 5: Contact points (if prep geometry provided) ─
     if (prepGeo) {
-      const cpResult = _checkContactPoints(restorationGeo, prepGeo, contactThresh);
+      const cpResult = _checkContactPoints(restorationGeo, prepGeo, contactThresh, rules.restorationMatrix, rules.prepMatrix);
       results.push({
         id: 'contacts_ok',
         label: 'Proximal contacts within tolerance',
@@ -6636,9 +6737,9 @@ const Validator = (() => {
       results.push({
         id: 'contacts_ok',
         label: 'Proximal contacts (no reference mesh)',
-        pass:  true,
+        pass:  false,
         value: 0,
-        message: 'Load opposing arch for contact analysis',
+        message: 'Incomplete — load opposing arch for contact analysis',
       });
     }
 
@@ -6658,12 +6759,24 @@ const Validator = (() => {
     return results;
   }
 
+  function runAllMeshes(restorationMesh, prepMesh = null, rules = {}) {
+    return runAll(restorationMesh?.geometry || null, prepMesh?.geometry || null, {
+      ...rules,
+      restorationMatrix: restorationMesh?.matrixWorld || null,
+      prepMatrix: prepMesh?.matrixWorld || null,
+    });
+  }
+
   function _checkManifold(posAttr) {
-    // Count edge occurrences: each edge (sorted v pair) should appear exactly 2x
+    // Weld duplicated STL corners before counting edge occurrences.
+    const vertexKeys = new Array(posAttr.count);
+    const q = v => Math.round(v * 1e5);
+    for (let i = 0; i < posAttr.count; i++) vertexKeys[i] = `${q(posAttr.getX(i))}:${q(posAttr.getY(i))}:${q(posAttr.getZ(i))}`;
     const edgeMap = new Map();
     for (let i = 0; i < posAttr.count; i += 3) {
       for (const [a, b] of [[i,i+1],[i+1,i+2],[i+2,i]]) {
-        const key = a < b ? `${a}_${b}` : `${b}_${a}`;
+        const ka = vertexKeys[a], kb = vertexKeys[b];
+        const key = ka < kb ? `${ka}|${kb}` : `${kb}|${ka}`;
         edgeMap.set(key, (edgeMap.get(key) ?? 0) + 1);
       }
     }
@@ -6674,21 +6787,38 @@ const Validator = (() => {
     return { pass: openEdges === 0, openEdges };
   }
 
-  function _checkContactPoints(geoA, geoB, threshold) {
-    // Simplified: find minimum distance between vertex clouds
+  function _checkContactPoints(geoA, geoB, threshold, matrixA = null, matrixB = null) {
+    // Spatially indexed full-resolution vertex-cloud distance.
     const posA = geoA.getAttribute('position');
     const posB = geoB.getAttribute('position');
+    const cellSize = Math.max(threshold, 1e-4);
+    const key = (x,y,z) => `${Math.floor(x/cellSize)}:${Math.floor(y/cellSize)}:${Math.floor(z/cellSize)}`;
+    const buckets = new Map();
+    const pointB = new THREE.Vector3();
+    for (let j = 0; j < posB.count; j++) {
+      pointB.set(posB.getX(j),posB.getY(j),posB.getZ(j));
+      if (matrixB) pointB.applyMatrix4(matrixB);
+      const k = key(pointB.x, pointB.y, pointB.z);
+      const list = buckets.get(k); if (list) list.push(j); else buckets.set(k,[j]);
+    }
     let minDist = Infinity;
     let contactCount = 0;
-    const step = Math.max(1, Math.floor(posA.count / 200)); // sample 200 pts max
-
-    for (let i = 0; i < posA.count; i += step) {
-      const ax = posA.getX(i), ay = posA.getY(i), az = posA.getZ(i);
-      for (let j = 0; j < posB.count; j += step) {
-        const dx = ax - posB.getX(j);
-        const dy = ay - posB.getY(j);
-        const dz = az - posB.getZ(j);
+    let distanceChecks = 0;
+    const worldA = new THREE.Vector3(), worldB = new THREE.Vector3();
+    for (let i = 0; i < posA.count; i++) {
+      worldA.set(posA.getX(i),posA.getY(i),posA.getZ(i));
+      if (matrixA) worldA.applyMatrix4(matrixA);
+      const ax = worldA.x, ay = worldA.y, az = worldA.z;
+      const cx=Math.floor(ax/cellSize),cy=Math.floor(ay/cellSize),cz=Math.floor(az/cellSize), candidates=[];
+      for(let dx=-1;dx<=1;dx++)for(let dy=-1;dy<=1;dy++)for(let dz=-1;dz<=1;dz++){const list=buckets.get(`${cx+dx}:${cy+dy}:${cz+dz}`);if(list)candidates.push(...list);}
+      for (const j of candidates) {
+        worldB.set(posB.getX(j),posB.getY(j),posB.getZ(j));
+        if (matrixB) worldB.applyMatrix4(matrixB);
+        const dx = ax - worldB.x;
+        const dy = ay - worldB.y;
+        const dz = az - worldB.z;
         const d  = Math.sqrt(dx*dx + dy*dy + dz*dz);
+        distanceChecks++;
         if (d < minDist) minDist = d;
         if (d <= threshold) contactCount++;
       }
@@ -6697,6 +6827,7 @@ const Validator = (() => {
       pass: minDist <= threshold + 0.1,
       maxGap: minDist,
       contactCount,
+      distanceChecks,
     };
   }
 
@@ -6709,7 +6840,7 @@ const Validator = (() => {
     return { x: cx/n, y: cy/n, z: cz/n };
   }
 
-  return { runAll };
+  return { runAll, runAllMeshes };
 })();
 
 
@@ -7317,6 +7448,9 @@ class CrownGeneratorEngine {
 
     this._cementShell      = new THREE.Mesh(geo, mat);
     this._cementShell.name = 'CementGapShell';
+    this._cementShell.position.copy(prepToothMesh.position);
+    this._cementShell.quaternion.copy(prepToothMesh.quaternion);
+    this._cementShell.scale.copy(prepToothMesh.scale);
     this._cementShell.renderOrder = 1;
     this.scene.add(this._cementShell);
 
@@ -7480,6 +7614,28 @@ class OcclusionHeatmapEngine {
   setOpposingPlane(y)         { this._material.uniforms.uOpposingY.value   = y; }
   setMaxDistance(mm)          { this._material.uniforms.uMaxDistance.value  = mm; }
 
+  analyzeMeshOcclusion(crownMesh, opposingMesh, opts = {}) {
+    if (!crownMesh?.geometry || !opposingMesh?.geometry) return { distances: [], contacts: 0, collisions: 0, minDistance: Infinity, maxDistance: 0 };
+    crownMesh.updateMatrixWorld(true); opposingMesh.updateMatrixWorld(true);
+    const cp=crownMesh.geometry.getAttribute('position'), op=opposingMesh.geometry.getAttribute('position');
+    if (!cp || !op || !cp.count || !op.count) return { distances: [], contacts: 0, collisions: 0, minDistance: Infinity, maxDistance: 0 };
+    const opposing=[], p=new THREE.Vector3();
+    for(let j=0;j<op.count;j++){p.set(op.getX(j),op.getY(j),op.getZ(j)).applyMatrix4(opposingMesh.matrixWorld);opposing.push(p.clone());}
+    const contactMM=opts.contactMM??.05, clearanceMM=opts.clearanceMM??.02, cellSize=Math.max(opts.indexCellSize??Math.max(contactMM*4,.25),1e-4);
+    const cellKey=(x,y,z)=>`${Math.floor(x/cellSize)}:${Math.floor(y/cellSize)}:${Math.floor(z/cellSize)}`, buckets=new Map();
+    opposing.forEach(q=>{const k=cellKey(q.x,q.y,q.z),list=buckets.get(k);if(list)list.push(q);else buckets.set(k,[q]);});
+    const distances=new Float32Array(cp.count), world=new THREE.Vector3(); let contacts=0,collisions=0,minDistance=Infinity,maxDistance=0,distanceChecks=0;
+    for(let i=0;i<cp.count;i++){
+      world.set(cp.getX(i),cp.getY(i),cp.getZ(i)).applyMatrix4(crownMesh.matrixWorld);
+      const cx=Math.floor(world.x/cellSize),cy=Math.floor(world.y/cellSize),cz=Math.floor(world.z/cellSize), candidates=[];
+      for(let dx=-1;dx<=1;dx++)for(let dy=-1;dy<=1;dy++)for(let dz=-1;dz<=1;dz++){const list=buckets.get(`${cx+dx}:${cy+dy}:${cz+dz}`);if(list)candidates.push(...list);}
+      const search=candidates.length?candidates:opposing; let best=Infinity;
+      for(const q of search){best=Math.min(best,world.distanceTo(q));distanceChecks++;}
+      distances[i]=best; minDistance=Math.min(minDistance,best); maxDistance=Math.max(maxDistance,best); if(best<=contactMM)contacts++; if(best<clearanceMM)collisions++;
+    }
+    return {distances,contacts,collisions,minDistance,maxDistance,contactMM,clearanceMM,distanceChecks,indexed:true};
+  }
+
   // ── Auto-trim high-spots ──────────────────────────────────
   /**
    * Clamps any vertex above `opposingY` down to
@@ -7494,14 +7650,18 @@ class OcclusionHeatmapEngine {
 
     const geom      = crownMesh.geometry;
     const pos       = geom.getAttribute('position');
+    crownMesh.updateMatrixWorld(true);
+    const invWorld  = crownMesh.matrixWorld.clone().invert();
+    const world     = new THREE.Vector3();
     const clearance = clearanceMM;   // already in scene units (vpScale applied by caller)
     let   trimmed   = 0;
 
     for (let i = 0; i < pos.count; i++) {
-      // Convert local Y → world Y
-      const worldY = pos.getY(i) + crownMesh.position.y;
-      if (worldY > opposingY) {
-        pos.setY(i, (opposingY - clearance) - crownMesh.position.y);
+      world.set(pos.getX(i), pos.getY(i), pos.getZ(i)).applyMatrix4(crownMesh.matrixWorld);
+      if (world.y > opposingY) {
+        world.y = opposingY - clearance;
+        world.applyMatrix4(invWorld);
+        pos.setXYZ(i, world.x, world.y, world.z);
         trimmed++;
       }
     }
@@ -7582,7 +7742,7 @@ const SmartSuggestions = (() => {
     if (vCount < 30) return _emptyResult();
 
     // ── Step 1: Base curvature (same as MarginDetector) ──────
-    const adj = _buildAdjMap(pos, vCount);
+    const adj = _buildAdjMap(pos, vCount, geo.index);
     const curv = _computeCurvature(pos, vCount, adj);
 
     // ── Step 2: Edge proximity score ─────────────────────────
@@ -7675,11 +7835,12 @@ const SmartSuggestions = (() => {
     };
   }
 
-  function _buildAdjMap(posAttr, vCount) {
+  function _buildAdjMap(posAttr, vCount, indexAttr = null) {
     const adj = new Array(vCount).fill(null).map(() => new Set());
-    for (let i = 0; i < vCount; i += 3) {
-      const a = i, b = i + 1, c = i + 2;
-      if (c < vCount) {
+    const triCount = indexAttr ? indexAttr.count : vCount;
+    for (let i = 0; i < triCount; i += 3) {
+      const a = indexAttr ? indexAttr.getX(i) : i, b = indexAttr ? indexAttr.getX(i + 1) : i + 1, c = indexAttr ? indexAttr.getX(i + 2) : i + 2;
+      if (c < vCount && b < vCount) {
         adj[a].add(b); adj[a].add(c);
         adj[b].add(a); adj[b].add(c);
         adj[c].add(a); adj[c].add(b);
@@ -7833,7 +7994,7 @@ const SmartSuggestions = (() => {
 
 window.SmartSuggestions = SmartSuggestions;
 
-/* === manufacturing === */
+// === manufacturing.js ===
 /**
  * manufacturing.js — Manufacturing pipeline helpers for DentalCAD
  *
@@ -8168,8 +8329,11 @@ const SupportGenerator = (() => {
 
     // Collect overhanging vertex positions
     const pos  = geo.getAttribute('position');
-    const norm = geo.getAttribute('normal');
-    if (!norm) { geo.computeVertexNormals(); }
+    let norm = geo.getAttribute('normal');
+    if (!norm) {
+      geo.computeVertexNormals();
+      norm = geo.getAttribute('normal');
+    }
 
     // Use a grid to avoid duplicate supports
     const grid     = new Map();
@@ -8268,7 +8432,7 @@ window.FolderWatch        = FolderWatch;
 window.NestingPreview     = NestingPreview;
 window.SupportGenerator   = SupportGenerator;
 
-/* === tools === */
+// === tools.js ===
 /**
  * tools.js
  * Interactive 3D tools that operate on the live mesh inside the viewport.
@@ -9597,9 +9761,9 @@ const Tools = (() => {
     SectionCutTool,
   };
 })();
-/* === viewport === */
+// === viewport.js ===
 /**
- * viewport.js — Three.js 3D viewport (complete rewrite)
+ * viewport.js — Three.js 3D viewport
  *
  * New in this version:
  *  - loadGeometry(geo)  : replace placeholder with any parsed BufferGeometry
@@ -9608,14 +9772,15 @@ const Tools = (() => {
  *  - render() is public so tools can trigger a frame after mutations
  *  - setWireframe / setGridVisible / setMarginRing unchanged API
  *  - OrbitControls implemented inline (no external dep)
+ *  - Pointer Events API (mouse + touch + pen, pinch-to-zoom)
  */
 
 const Viewport = (() => {
 
   // ── Internal state ─────────────────────────────────────────
   let renderer, scene, camera;
-  let toothGroup = null;   // placeholder group (sphere+cone)
-  let userMesh   = null;   // loaded STL/OBJ mesh
+  let toothGroup = null;
+  let userMesh   = null;
   let gridGroup  = null;
   let canvas;
 
@@ -9628,7 +9793,6 @@ const Viewport = (() => {
     zoom: 6,
   };
 
-  // shared material kept so wireframe/clipping changes apply to loaded meshes too
   let meshMaterial = null;
 
   // ── Orbit helpers ──────────────────────────────────────────
@@ -9736,145 +9900,244 @@ const Viewport = (() => {
     el.style.touchAction = 'none';
   }
 
-  // ── Default tooth placeholder (anatomical molar) ─────────
+  // ── Default tooth placeholder — lower first molar ─────────
   /**
-   * Builds a parametric upper molar placeholder using:
-   *  - LatheGeometry for the main crown profile (bell-curve cross section)
-   *  - Cusp bumps via displaced vertices on the occlusal surface
-   *  - Slight asymmetry so it doesn't look purely computational
-   *  - Three roots: MB, DB, Palatal
-   *  - MeshPhongMaterial with realistic ivory + specular settings
+   * Anatomically-informed lower first molar (FDI #36) placeholder.
+   *
+   * CROWN
+   *  - LatheGeometry profile: cervical constriction → equatorial bulge → occlusal
+   *  - Scalloped CEJ via per-vertex sine-wave modulation (2 dips/cycle)
+   *  - 5 Gaussian cusp bumps + central fossa + buccal groove on occlusal
+   *  - Micro-noise (±0.025) breaks perfect rotational symmetry
+   *  - Enamel: bright ivory, high shininess, warm specular
+   *
+   * CEJ BAND
+   *  - Scalloped torus that visually separates crown from roots
+   *  - Slightly lighter cementum colour
+   *
+   * ROOTS (lower molar = mesial + distal, 2 roots)
+   *  - Cubic radius taper (stays wide near CEJ, narrows fast at apex)
+   *  - S-curve deformation per root (buccal lean + apical hook)
+   *  - Compression groove (mesial root)
+   *  - Micro-noise on root surface
+   *  - Darker cementum material, low shininess
    */
   function _buildPlaceholder() {
     const group = new THREE.Group();
 
-    // ── Crown via LatheGeometry ──────────────────────────────
-    // Profile points: traced from the cervical margin up to the occlusal table.
-    // The tooth is widest ~35% from the bottom (cervical bulge), then tapers
-    // to the occlusal table with a slight platform.
+    // ── Shared PRNG (reproducible micro-noise) ──────────────
+    let _seed = 42;
+    function _rand() {
+      _seed = (_seed * 1664525 + 1013904223) & 0xFFFFFFFF;
+      return (_seed >>> 0) / 0xFFFFFFFF - 0.5;   // -0.5 … +0.5
+    }
+
+    // ── Materials ───────────────────────────────────────────
+    const enamelMat = new THREE.MeshPhongMaterial({
+      color:     0xeee0c6,   // pale ivory — enamel
+      specular:  0xd8c8a0,   // warm gloss
+      shininess: 72,
+      side:      THREE.DoubleSide,
+    });
+    meshMaterial = enamelMat;   // keep reference for loadGeometry()
+
+    const cementumMat = new THREE.MeshPhongMaterial({
+      color:     0xb89060,   // yellow-tan — cementum/dentin
+      specular:  0x604828,
+      shininess: 14,
+      side:      THREE.DoubleSide,
+    });
+
+    const cejMat = new THREE.MeshPhongMaterial({
+      color:     0xd4c090,
+      specular:  0x888060,
+      shininess: 30,
+      side:      THREE.DoubleSide,
+    });
+
+    // ────────────────────────────────────────────────────────
+    // CROWN  (LatheGeometry profile revolution)
+    // ────────────────────────────────────────────────────────
+    const SEGS = 36;
     const profile = [
-      new THREE.Vector2(0.00,  0.00),   // apex (will be hidden by roots)
-      new THREE.Vector2(0.35, -0.10),   // root–crown junction
-      new THREE.Vector2(0.70,  0.00),   // CEJ / cervical line
-      new THREE.Vector2(0.82,  0.18),   // sub-equatorial bulge
-      new THREE.Vector2(0.88,  0.38),   // equator (widest point)
-      new THREE.Vector2(0.82,  0.58),   // supra-equatorial taper
-      new THREE.Vector2(0.72,  0.75),   // occlusal shoulder
-      new THREE.Vector2(0.60,  0.88),   // inner occlusal
-      new THREE.Vector2(0.30,  0.95),   // central fossa
-      new THREE.Vector2(0.00,  0.98),   // occlusal centre
+      // [radius, y]     anatomical landmark
+      [0.00,  1.00],    // occlusal centre
+      [0.24,  0.98],    // central fossa rim
+      [0.56,  0.88],    // inner occlusal table
+      [0.72,  0.76],    // occlusal shoulder
+      [0.84,  0.60],    // supra-equatorial taper
+      [0.92,  0.40],    // equator (maximum convexity)
+      [0.88,  0.20],    // sub-equatorial constriction
+      [0.78,  0.08],    // cervical bulge
+      [0.68,  0.00],    // CEJ (coordinate origin)
+      [0.60, -0.08],    // sub-CEJ transition to root trunk
+    ].map(([r, y]) => new THREE.Vector2(r, y));
+
+    const crownGeo = new THREE.LatheGeometry(profile, SEGS);
+    const cPos     = crownGeo.attributes.position;
+
+    // 5 cusp centres (MB, DB, ML, DL + distal minor)
+    const cusps = [
+      { ax:  0.50, az:  0.52, h: 0.16, r: 0.28 },
+      { ax: -0.50, az:  0.52, h: 0.15, r: 0.28 },
+      { ax:  0.48, az: -0.50, h: 0.15, r: 0.28 },
+      { ax: -0.48, az: -0.50, h: 0.14, r: 0.28 },
+      { ax: -0.10, az:  0.70, h: 0.08, r: 0.18 },   // distal minor cusp
     ];
 
-    const crownGeo = new THREE.LatheGeometry(profile, 28);
-    // Reposition so the crown sits with its occlusal table at y=0.98
-    // and the CEJ at y≈0
-
-    // ── Add cusp bumps by displacing occlusal-area vertices ──
-    const cPos  = crownGeo.attributes.position;
-    const cNorm = crownGeo.attributes.normal;
-
-    // Four cusp centres on the occlusal plane (normalised x-z directions)
-    const cuspDirs = [
-      { ax:  0.55, az:  0.60 },   // MB cusp
-      { ax: -0.55, az:  0.60 },   // DB cusp
-      { ax:  0.55, az: -0.60 },   // ML cusp
-      { ax: -0.55, az: -0.60 },   // DL cusp
-    ];
-    const cuspHeight = 0.14;
-    const cuspRadius = 0.30;
+    // Buccal groove (depression on buccal face)
+    const bGroove = { ax: 0.0, az: 0.62, depth: -0.04, r: 0.15 };
 
     for (let i = 0; i < cPos.count; i++) {
-      const vx = cPos.getX(i);
-      const vy = cPos.getY(i);
-      const vz = cPos.getZ(i);
+      let vx = cPos.getX(i);
+      let vy = cPos.getY(i);
+      let vz = cPos.getZ(i);
 
-      // Only affect top portion (occlusal surface, y > 0.68)
-      if (vy < 0.68) continue;
-
-      let bumpSum = 0;
-      for (const { ax, az } of cuspDirs) {
-        const dx = vx - ax;
-        const dz = vz - az;
-        const dist = Math.sqrt(dx * dx + dz * dz);
-        // Gaussian falloff
-        bumpSum += cuspHeight * Math.exp(-(dist * dist) / (cuspRadius * cuspRadius));
+      // ── 1. Scalloped CEJ ────────────────────────────────────
+      if (Math.abs(vy) < 0.16) {
+        const angle   = Math.atan2(vz, vx);
+        const scallop = 0.045 * Math.sin(angle * 2 + 0.4);
+        vy += scallop * (1 - Math.abs(vy) / 0.16);
       }
 
-      // Central fossa — slight depression between cusps
-      const centDist = Math.sqrt(vx * vx + vz * vz);
-      const fossa    = -0.06 * Math.exp(-(centDist * centDist) / 0.09);
-      bumpSum += fossa;
+      // ── 2. Occlusal surface (cusps + fossa + groove) ────────
+      if (vy > 0.60) {
+        let bumpY = 0;
+        for (const { ax, az, h, r } of cusps) {
+          const dx = vx - ax, dz = vz - az;
+          bumpY += h * Math.exp(-(dx*dx + dz*dz) / (r * r));
+        }
+        // Central fossa depression
+        const cfDist = Math.sqrt(vx*vx + vz*vz);
+        bumpY -= 0.08 * Math.exp(-(cfDist * cfDist) / 0.06);
+        // Buccal groove
+        const bgDx = vx - bGroove.ax, bgDz = vz - bGroove.az;
+        bumpY += bGroove.depth * Math.exp(-(bgDx*bgDx + bgDz*bgDz) / (bGroove.r * bGroove.r));
+        vy += bumpY;
+      }
 
-      // Asymmetry — mesial side (positive z) very slightly wider
-      const asymm = vz > 0 ? 0.025 : -0.012;
+      // ── 3. Micro-noise ───────────────────────────────────────
+      const noise = 0.025 * _rand();
+      const rDist = Math.sqrt(vx*vx + vz*vz);
+      vx += noise * rDist * 0.6;
+      vz += noise * rDist * 0.6;
+      vy += noise * 0.5;
 
-      cPos.setY(i, vy + bumpSum);
-      cPos.setX(i, vx * (1 + asymm));
+      cPos.setXYZ(i, vx, vy, vz);
     }
 
     crownGeo.computeVertexNormals();
-
-    const crownMat = new THREE.MeshPhongMaterial({
-      color:     0xede0c8,   // ivory
-      specular:  0xb0a888,   // warm specular
-      shininess: 55,
-      side:      THREE.DoubleSide,
-    });
-    meshMaterial = crownMat;
-
-    const crown = new THREE.Mesh(crownGeo, crownMat);
-    // Scale: ~10 mm wide, 8 mm tall (scene units ≈ mm)
-    crown.scale.set(1.05, 0.92, 0.95);
-    crown.position.y = 0;
+    const crown = new THREE.Mesh(crownGeo, enamelMat);
+    crown.scale.set(1.08, 0.88, 1.00);
     group.add(crown);
 
-    // ── Three roots ──────────────────────────────────────────
-    const rootMat = new THREE.MeshPhongMaterial({
-      color:     0xc8a870,
-      specular:  0x806040,
-      shininess: 20,
-      side:      THREE.DoubleSide,
-    });
+    // ────────────────────────────────────────────────────────
+    // CEJ BAND (scalloped torus at cervical line)
+    // ────────────────────────────────────────────────────────
+    const cejGeo = new THREE.TorusGeometry(0.68, 0.028, 10, SEGS);
+    const cejPos = cejGeo.attributes.position;
+    for (let i = 0; i < cejPos.count; i++) {
+      const ang     = Math.atan2(cejPos.getZ(i), cejPos.getX(i));
+      const scallop = 0.04 * Math.sin(ang * 2 + 0.4);
+      cejPos.setY(i, cejPos.getY(i) + scallop);
+    }
+    cejGeo.computeVertexNormals();
+    const cejRing = new THREE.Mesh(cejGeo, cejMat);
+    cejRing.scale.set(1.08, 1.0, 1.00);
+    cejRing.position.y = 0.01;
+    cejRing.rotation.x = Math.PI / 2;
+    group.add(cejRing);
 
-    // Helper: tapered cylinder with slight curve
-    function _makeRoot(rTop, rBot, len, segs, offX, offZ, tiltZ) {
-      const geo = new THREE.CylinderGeometry(rTop, rBot, len, segs, 4, false);
-      // Taper the upper end inward (blend into crown)
-      const rp = geo.attributes.position;
+    // ────────────────────────────────────────────────────────
+    // ROOTS  (2: mesial + distal)
+    // ────────────────────────────────────────────────────────
+    function _makeRoot(params) {
+      const { rCEJ, rApex, length, radialSegs, heightSegs,
+              offX, offZ, curveX, curveZ, apexX, apexZ } = params;
+
+      const geo = new THREE.CylinderGeometry(rCEJ, rApex, length, radialSegs, heightSegs, false);
+      const rp  = geo.attributes.position;
+
       for (let i = 0; i < rp.count; i++) {
-        const y  = rp.getY(i);
-        const t  = (y / len + 0.5);   // 0 at bottom, 1 at top
-        // Slight curvature along Z
-        rp.setZ(i, rp.getZ(i) + tiltZ * t * 0.4);
+        let vx = rp.getX(i);
+        let vy = rp.getY(i);
+        let vz = rp.getZ(i);
+
+        // t = 0 at CEJ (top), t = 1 at apex (bottom)
+        const t = (vy / (-length) + 0.5);
+
+        // ── Cubic radius taper ───────────────────────────────
+        const rLinear = rCEJ + (rApex - rCEJ) * t;
+        const rCubic  = rCEJ + (rApex - rCEJ) * (t * t * (3 - 2 * t));
+        const sc      = rLinear > 0.001 ? (rCubic / rLinear) : 1;
+        vx *= sc;
+        vz *= sc;
+
+        // ── S-curve (lean + apical hook) ─────────────────────
+        const curveT = Math.sin(t * Math.PI * 0.85);
+        vx += curveX * curveT + apexX * t * t;
+        vz += curveZ * curveT + apexZ * t * t;
+
+        // ── Compression groove (mesial face) ─────────────────
+        const angle  = Math.atan2(vz, vx);
+        const groove = 0.022 * Math.exp(-Math.pow(angle - Math.PI * 0.5, 2) / 0.3);
+        const r      = Math.sqrt(vx*vx + vz*vz);
+        if (r > 0.01) { vx *= (1 - groove / r); vz *= (1 - groove / r); }
+
+        // ── Micro-noise ──────────────────────────────────────
+        _seed = (i * 7 + 99) | 0;
+        vx += 0.012 * _rand() * (1 - t);
+        vz += 0.012 * _rand() * (1 - t);
+
+        rp.setXYZ(i, vx, vy, vz);
       }
       geo.computeVertexNormals();
-      const m = new THREE.Mesh(geo, rootMat);
-      m.position.set(offX, -len * 0.5, offZ);
-      return m;
+      const mesh = new THREE.Mesh(geo, cementumMat);
+      mesh.position.set(offX, -(length * 0.5 + 0.02), offZ);
+      return mesh;
     }
 
-    // MB root
-    group.add(_makeRoot(0.20, 0.06, 1.55, 14,  0.28, 0.18, -0.08));
-    // DB root
-    group.add(_makeRoot(0.18, 0.05, 1.45, 14, -0.26, 0.20,  0.06));
-    // Palatal root (longest, most upright)
-    group.add(_makeRoot(0.22, 0.07, 1.75, 14,  0.04, -0.24, 0.10));
+    // Mesial root — longer, more curved, mesial lean
+    group.add(_makeRoot({
+      rCEJ: 0.26, rApex: 0.055, length: 1.75,
+      radialSegs: 16, heightSegs: 8,
+      offX:  0.24, offZ:  0.10,
+      curveX: -0.12, curveZ:  0.06,
+      apexX: -0.06,  apexZ:  0.02,
+    }));
+
+    // Distal root — shorter, more upright
+    group.add(_makeRoot({
+      rCEJ: 0.24, rApex: 0.048, length: 1.52,
+      radialSegs: 16, heightSegs: 8,
+      offX: -0.24, offZ:  0.10,
+      curveX:  0.08, curveZ:  0.04,
+      apexX:  0.04,  apexZ:  0.02,
+    }));
 
     // ── Margin ring (cyan) — hidden by default ───────────────
-    const ring = new THREE.Mesh(
-      new THREE.TorusGeometry(0.78, 0.022, 8, 64),
+    const marginRing = new THREE.Mesh(
+      new THREE.TorusGeometry(0.72, 0.022, 8, SEGS),
       new THREE.MeshBasicMaterial({ color: 0x00aaff })
     );
-    ring.name = 'marginRing';
-    ring.position.set(0, 0.01, 0);
-    ring.rotation.x = Math.PI / 2;
-    ring.visible = false;
-    group.add(ring);
+    marginRing.name = 'marginRing';
+    marginRing.scale.set(1.08, 1.0, 1.00);
+    marginRing.position.y = 0.03;
+    marginRing.rotation.x = Math.PI / 2;
+    marginRing.visible = false;
+    group.add(marginRing);
 
-    // Shift whole group so crown occlusal is up, roots hang down
     group.position.y = 0.55;
-
     return group;
+  }
+
+  function _makeMaterial() {
+    return new THREE.MeshPhongMaterial({
+      color:     0xeee0c6,
+      specular:  0xd8c8a0,
+      shininess: 72,
+      side:      THREE.DoubleSide,
+    });
   }
 
   // ── Grid ───────────────────────────────────────────────────
@@ -9901,14 +10164,46 @@ const Viewport = (() => {
     return g;
   }
 
-  // ── Public mesh reference (used by tools) ─────────────────
-  // Tools need a single mesh object with a .geometry.getAttribute('position')
-  // When a user file is loaded, this is the loaded mesh.
-  // When placeholder is active, it's the crown mesh inside toothGroup.
-  function _getActiveMesh() {
-    if (userMesh) return userMesh;
-    if (toothGroup) return toothGroup.children[0]; // crown sphere
-    return null;
+
+  // ── 2-D fallback ───────────────────────────────────────────
+  function _drawFallback(el, msg) {
+    const ctx2 = el.getContext('2d');
+    if (!ctx2) return;
+    const message = msg || '3D Viewport — loading Three.js…';
+    const draw = () => {
+      const w = el.width  || el.parentElement?.offsetWidth  || 400;
+      const h = el.height || el.parentElement?.offsetHeight || 300;
+      if (el.width  !== w) el.width  = w;
+      if (el.height !== h) el.height = h;
+      const g = ctx2.createLinearGradient(0, 0, 0, h);
+      g.addColorStop(0, '#1c1c1e'); g.addColorStop(1, '#111113');
+      ctx2.fillStyle = g; ctx2.fillRect(0, 0, w, h);
+      ctx2.save();
+      ctx2.translate(w / 2, h / 2 - 40);
+      ctx2.strokeStyle = 'rgba(59,130,246,0.4)';
+      ctx2.lineWidth   = 2;
+      ctx2.beginPath();
+      ctx2.arc(0, 0, 28, 0, Math.PI * 2);
+      ctx2.stroke();
+      ctx2.fillStyle = 'rgba(59,130,246,0.15)';
+      ctx2.fill();
+      ctx2.fillStyle = 'rgba(96,165,250,0.7)';
+      ctx2.font = '26px serif';
+      ctx2.textAlign = 'center';
+      ctx2.textBaseline = 'middle';
+      ctx2.fillText('🦷', 0, 1);
+      ctx2.restore();
+      ctx2.fillStyle = '#9ca3af';
+      ctx2.font = '13px "Inter", system-ui, sans-serif';
+      ctx2.textAlign = 'center';
+      ctx2.textBaseline = 'alphabetic';
+      ctx2.fillText(message, w / 2, h / 2 + 10);
+      ctx2.fillStyle = '#4b5563';
+      ctx2.font = '11px "Inter", system-ui, sans-serif';
+      ctx2.fillText('LMB: Rotate  ·  RMB: Pan  ·  Scroll: Zoom', w / 2, h / 2 + 30);
+    };
+    draw();
+    window.addEventListener('resize', draw);
   }
 
   // ── Init ───────────────────────────────────────────────────
@@ -9921,7 +10216,7 @@ const Viewport = (() => {
       return;
     }
 
-    // Guard: if the canvas is still 0×0 (parent not painted yet), retry once
+    // Guard: if canvas is still 0×0 (parent not painted yet), resize from parent
     const w0 = canvasEl.offsetWidth  || canvasEl.width;
     const h0 = canvasEl.offsetHeight || canvasEl.height;
     if (w0 === 0 || h0 === 0) {
@@ -9937,7 +10232,7 @@ const Viewport = (() => {
       renderer = new THREE.WebGLRenderer({ canvas: canvasEl, antialias: true });
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
       renderer.setClearColor(0x111113, 1);
-      renderer.localClippingEnabled = true;   // needed for SectionCutTool
+      renderer.localClippingEnabled = true;
 
       scene  = new THREE.Scene();
       scene.fog = new THREE.FogExp2(0x111113, 0.035);
@@ -9979,7 +10274,6 @@ const Viewport = (() => {
   }
 
   function _exposeToTools() {
-    // Re-build context object whenever mesh changes
     Tools.setContext({
       get scene()    { return scene; },
       get camera()   { return camera; },
@@ -9991,29 +10285,18 @@ const Viewport = (() => {
   }
 
   // ── Load parsed geometry ───────────────────────────────────
-  /**
-   * Replace whatever is in the viewport with a new BufferGeometry.
-   * Called by app.js after STLParser.parseFile() resolves.
-   * @param {THREE.BufferGeometry} geo
-   * @param {object} stats – { vertices, triangles, dimensions }
-   */
   function loadGeometry(geo, stats) {
-    // Remove previous user mesh
     if (userMesh) { scene.remove(userMesh); userMesh = null; }
-    // Hide placeholder
     if (toothGroup) toothGroup.visible = false;
 
-    // Build material fresh (keeps clipping planes etc.)
     const mat = _makeMaterial();
     userMesh  = new THREE.Mesh(geo, mat);
     userMesh.geometry.userData.stats = stats || {};
     meshMaterial = mat;
     scene.add(userMesh);
 
-    // Re-expose to tools (mesh reference changed)
     _exposeToTools();
 
-    // Reset orbit to frame the model nicely
     orbit.rotX = 20; orbit.rotY = -30;
     orbit.panX = 0;  orbit.panY = 0;
     orbit.zoom = 5;
@@ -10041,7 +10324,7 @@ const Viewport = (() => {
     renderer.render(scene, camera);
   }
 
-  // ── Render (public — tools call this after mutations) ──────
+  // ── Render (public) ────────────────────────────────────────
   function render() {
     if (renderer && scene && camera) renderer.render(scene, camera);
   }
@@ -10083,59 +10366,27 @@ const Viewport = (() => {
     }
   }
 
-  // ── Current geometry accessor for export ──────────────────
+  // ── Current geometry accessor ──────────────────────────────
   function getCurrentGeometry() {
     const m = _getActiveMesh();
     return m ? m.geometry : null;
   }
 
-  // ── 2-D fallback ───────────────────────────────────────────
-  function _drawFallback(el, msg) {
-    const ctx2 = el.getContext('2d');
-    if (!ctx2) return;
-    const message = msg || '3D Viewport — loading Three.js…';
-    const draw = () => {
-      const w = el.width  || el.parentElement?.offsetWidth  || 400;
-      const h = el.height || el.parentElement?.offsetHeight || 300;
-      if (el.width  !== w) el.width  = w;
-      if (el.height !== h) el.height = h;
-      const g = ctx2.createLinearGradient(0, 0, 0, h);
-      g.addColorStop(0, '#1c1c1e'); g.addColorStop(1, '#111113');
-      ctx2.fillStyle = g; ctx2.fillRect(0, 0, w, h);
-      // Tooth icon placeholder
-      ctx2.save();
-      ctx2.translate(w / 2, h / 2 - 40);
-      ctx2.strokeStyle = 'rgba(59,130,246,0.4)';
-      ctx2.lineWidth   = 2;
-      ctx2.beginPath();
-      ctx2.arc(0, 0, 28, 0, Math.PI * 2);
-      ctx2.stroke();
-      ctx2.fillStyle = 'rgba(59,130,246,0.15)';
-      ctx2.fill();
-      ctx2.fillStyle = 'rgba(96,165,250,0.7)';
-      ctx2.font = '26px serif';
-      ctx2.textAlign = 'center';
-      ctx2.textBaseline = 'middle';
-      ctx2.fillText('🦷', 0, 1);
-      ctx2.restore();
-      ctx2.fillStyle = '#9ca3af';
-      ctx2.font = '13px "Inter", system-ui, sans-serif';
-      ctx2.textAlign = 'center';
-      ctx2.textBaseline = 'alphabetic';
-      ctx2.fillText(message, w / 2, h / 2 + 10);
-      ctx2.fillStyle = '#4b5563';
-      ctx2.font = '11px "Inter", system-ui, sans-serif';
-      ctx2.fillText('LMB: Rotate  ·  RMB: Pan  ·  Scroll: Zoom', w / 2, h / 2 + 30);
-    };
-    draw();
-    window.addEventListener('resize', draw);
+  function _getActiveMesh() {
+    if (userMesh) return userMesh;
+    if (toothGroup && toothGroup.visible) {
+      // Return the crown mesh (first LatheGeometry child)
+      for (const child of toothGroup.children) {
+        if (child.isMesh) return child;
+      }
+    }
+    return null;
   }
 
   return {
     init, resize, render,
     loadGeometry, resetPlaceholder, getCurrentGeometry,
     setGridVisible, setWireframe, setMarginRing, setView, setColor,
-    // Extra accessors for analysis modules
     getMeshMaterial: () => meshMaterial,
     getScene:        () => scene,
     getCamera:       () => camera,
@@ -10143,7 +10394,7 @@ const Viewport = (() => {
     getCurrentMesh:  () => (userMesh || (toothGroup && toothGroup.children[0]) || null),
   };
 })();
-/* === dental-chart === */
+// === dental-chart.js ===
 /**
  * dental-chart.js — Interactive 32-tooth FDI chart
  * v3 ULTIMATE: Photorealistic anatomical SVG teeth with:
@@ -10639,8 +10890,7 @@ const DentalChart = (() => {
 
   return { render, getSelected, clearAll, selectAll, selectByNumbers };
 })();
-
-/* === wizard === */
+// === wizard.js ===
 /**
  * wizard.js — 7-step wizard: state machine + step indicator + nav buttons
  */
@@ -10887,7 +11137,7 @@ const Wizard = (() => {
 
   return { init, next, back, goTo, getData, getStep, getStepName };
 })();
-/* === app === */
+// === app.js ===
 /**
  * app.js — Main application controller v4
  * New: Logger init, WallThickness heatmap, MarginDetector,
@@ -11349,11 +11599,21 @@ document.addEventListener('DOMContentLoaded', () => {
       case 'exit':          if (confirm('Close DentalCAD?')) window.close(); break;
       case 'undo':          _doUndo();           break;
       case 'redo':          _doRedo();           break;
+      case 'mirror':        _mirrorCurrentMesh(); break;
+      case 'reset-library': _resetToSelectedLibrary(); break;
+      case 'view-front':    Viewport.setView('front'); break;
+      case 'view-top':      Viewport.setView('top');   break;
+      case 'view-side':     Viewport.setView('side');  break;
       case 'toggle-grid':   gridBtn.click();     break;
       case 'toggle-wire':   wireBtn.click();     break;
       case 'toggle-left':   document.getElementById('left-dock').classList.toggle('hidden');  break;
       case 'toggle-right':  document.getElementById('right-dock').classList.toggle('hidden'); break;
       case 'modules':       openModal('modules-modal'); break;
+      case 'mod-crown':     openModal('modules-modal'); setMsg('Crown & Bridge module selected.'); break;
+      case 'mod-implant':   openModal('modules-modal'); setMsg('Implant module selected.'); break;
+      case 'mod-denture':   openModal('modules-modal'); setMsg('Full Denture module selected.'); break;
+      case 'mod-model':     openModal('modules-modal'); setMsg('Model Creator module selected.'); break;
+      case 'mod-guide':     openModal('modules-modal'); setMsg('Surgical Guide module selected.'); break;
       case 'shortcuts':     openModal('shortcuts-modal'); break;
       case 'about':         openModal('about-modal'); break;
       case 'margin-line':   activateTool('Margin Line'); break;
@@ -11363,6 +11623,22 @@ document.addEventListener('DOMContentLoaded', () => {
       case 'folder-watch':  openModal('folder-watch-modal'); break;
       default: setMsg(`${action} (placeholder)`);
     }
+  }
+
+  function _mirrorCurrentMesh() {
+    const geo = Viewport.getCurrentGeometry?.(), attr = geo?.getAttribute('position');
+    if (!attr) { setMsg('Load a design before mirroring.', 2500); return; }
+    const before = new Float32Array(attr.array), after = new Float32Array(before);
+    for (let i = 0; i < after.length; i += 3) after[i] = -after[i];
+    const apply = values => { attr.array.set(values); attr.needsUpdate = true; geo.computeVertexNormals(); Viewport.render?.(); };
+    UndoRedo.push(new UndoRedo.MeshStateCommand('Mirror design', before, after, apply));
+    ProjectIO.markDirty(); _scheduleAutoSave(); setMsg('Design mirrored across the midline.');
+  }
+
+  function _resetToSelectedLibrary() {
+    const card = document.querySelector('#lib-step-grid .lib-card.selected') || document.querySelector('.lib-thumb.selected');
+    if (!card) { setMsg('Select a tooth library shape first.', 2500); return; }
+    _loadLibraryShape(card);
   }
 
   // ═══════════════════════════════════════════════════════════
@@ -12125,7 +12401,7 @@ document.addEventListener('DOMContentLoaded', () => {
       dz.querySelector('.drop-icon').textContent  = '📂';
       dz.querySelector('.drop-title').textContent = 'Drop scan file here';
       dz.querySelector('.drop-title').style.color = '';
-      dz.querySelector('.drop-sub').textContent   = 'Supported: .stl  .obj  .ply  .3oxz  .dcm';
+      dz.querySelector('.drop-sub').textContent   = 'Supported: .stl  .obj  .ply (ASCII)';
     }
     document.getElementById('scan-info-card')?.classList.add('hidden');
     document.getElementById('scan-status').textContent = '';
@@ -12281,38 +12557,74 @@ document.addEventListener('DOMContentLoaded', () => {
   // Async auto-save check (IndexedDB)
   (async () => {
     const has = await ProjectIO.hasAutoSave();
-    if (has) {
-      const saved = await ProjectIO.loadAutoSave();
-      // Only show the restore banner when the saved case has real data.
-      // An empty auto-save (no patient name, no teeth, no restoration) is
-      // silently discarded — showing a banner for it is confusing noise.
-      const cd = saved?.caseData;
-      const hasRealData = cd && (
-        (cd.patient  && cd.patient.trim()  && cd.patient  !== '—') ||
-        (cd.restoration && cd.restoration !== '—') ||
-        (Array.isArray(cd.selectedTeeth) && cd.selectedTeeth.length > 0) ||
-        cd.scanFile
-      );
-      if (saved && hasRealData) {
-        const when = saved.savedAt ? saved.savedAt.split('T')[0] : '';
-        _showRestoreBanner(saved, when);
-      } else if (has && !hasRealData) {
-        // Clean up the empty record so it doesn't nag on every reload
-        ProjectIO.clearAutoSave?.();
-      }
+    if (!has) return;
+
+    const saved = await ProjectIO.loadAutoSave();
+    if (!saved) return;
+
+    const cd = saved?.caseData;
+
+    /**
+     * A saved case is "substantive" (worth asking to restore) if it has
+     * at least one piece of real user-entered data.
+     *
+     * We explicitly exclude:
+     *  - The default placeholder patient value '—'
+     *  - Values that look like HTML placeholder text (start with "e.g.")
+     *  - The auto-generated default Case ID (matches CASE-YYYY-#### pattern
+     *    with no other real data alongside it)
+     */
+    function _isSubstantive(caseData) {
+      if (!caseData) return false;
+
+      const patient = (caseData.patient || '').trim();
+      const caseId  = (caseData.caseId  || '').trim();
+
+      const patientReal = patient.length > 0 &&
+        patient !== '—' &&
+        !patient.startsWith('e.g.') &&
+        patient !== 'Unnamed';
+
+      // Case ID is considered "real" only if user changed it from the default
+      const defaultCaseIdPattern = /^CASE-\d{4}-\d+$/;
+      const caseIdReal = caseId.length > 0 &&
+        caseId !== '—' &&
+        !defaultCaseIdPattern.test(caseId);
+
+      const hasTeeth       = Array.isArray(caseData.selectedTeeth) && caseData.selectedTeeth.length > 0;
+      const hasRestoration = caseData.restoration && caseData.restoration !== '—';
+      const hasScan        = !!(caseData.scanFile || caseData.scanFileName);
+
+      return patientReal || caseIdReal || hasTeeth || hasRestoration || hasScan;
+    }
+
+    if (_isSubstantive(cd)) {
+      const when = saved.savedAt ? saved.savedAt.split('T')[0] : '';
+      _showRestoreBanner(saved, when);
+    } else {
+      // Empty / default-only record — delete silently, don't show the banner
+      await ProjectIO.clearAutoSave();
+      if (typeof Logger !== 'undefined')
+        Logger.info('AutoSave', 'Empty auto-save discarded silently');
     }
   })();
 
   function _showRestoreBanner(saved, when) {
     const banner = document.getElementById('restore-banner');
+    const cd     = saved.caseData;
+    // Build a human-readable label — prefer patient name, fall back to case ID
+    const label  = (cd.patient && cd.patient !== '—' && cd.patient !== 'Unnamed')
+      ? cd.patient
+      : (cd.caseId && cd.caseId !== '—' ? cd.caseId : 'Previous session');
+
     if (!banner) {
       // Fallback: auto-restore without asking
       _applyLoadedProject(saved);
-      setMsg(`Auto-save restored: ${saved.caseData.patient} (${when})`, 5000);
+      setMsg(`Auto-save restored: ${label} (${when})`, 5000);
       return;
     }
     document.getElementById('restore-banner-text').textContent =
-      `Auto-save found: ${saved.caseData.patient || 'Unnamed'} — ${when}`;
+      `Auto-save found: ${label} — ${when}`;
     banner.classList.remove('hidden');
     document.getElementById('restore-btn-yes').onclick = () => {
       banner.classList.add('hidden');
@@ -12499,7 +12811,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const matSel   = document.querySelector('#props-panel .form-select');
     const material = matSel?.value || 'Zirconia (3Y-TZP)';
     const thresh   = WallThickness.getThresholds(material);
-    const results  = Validator.runAll(geo, null, {
+    const results  = Validator.runAllMeshes(Viewport.getCurrentMesh?.(), _opposingMesh, {
       material,
       minThickness: thresh.minThick,
       maxThickness: thresh.maxThick,
@@ -13090,6 +13402,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const pos    = mesh.geometry.getAttribute('position');
     const colors = mesh.geometry.getAttribute('color');
+    _initEngines();
 
     // Build colour attribute if not present
     let colorAttr = colors;
@@ -13100,17 +13413,22 @@ document.addEventListener('DOMContentLoaded', () => {
       if (mat) { mat.vertexColors = true; mat.needsUpdate = true; }
     }
 
-    // Determine reference Y from opposing mesh or occ-opposing-y slider
+    const meshReport = _opposingMesh && _occlusionEngine
+      ? _occlusionEngine.analyzeMeshOcclusion(mesh, _opposingMesh, {
+          contactMM: CONTACT_THRESH,
+          clearanceMM: parseFloat(document.getElementById('occ-clearance')?.value ?? 0.02),
+        }) : null;
     const oppY = _opposingMesh
-      ? _opposingMesh.position.y + _opposingMesh.geometry.boundingBox?.min?.y ?? 0
+      ? ((_opposingMesh.geometry.boundingBox || _opposingMesh.geometry.computeBoundingBox(), _opposingMesh.position.y + (_opposingMesh.geometry.boundingBox?.min?.y ?? 0)))
       : parseFloat(document.getElementById('occ-opposing-y')?.value ?? 2.5);
 
     let contactCount = 0;
     const grid = new Map();
 
     for (let i = 0; i < pos.count; i++) {
-      const wy   = pos.getY(i) + mesh.position.y;
-      const dist = Math.abs(wy - oppY);
+      const worldPoint = new THREE.Vector3(pos.getX(i), pos.getY(i), pos.getZ(i)).applyMatrix4(mesh.matrixWorld);
+      const wy   = worldPoint.y;
+      const dist = meshReport ? meshReport.distances[i] : Math.abs(wy - oppY);
 
       if (dist < CONTACT_THRESH) {
         // Colour vertex: red = collision, orange = near contact
@@ -13122,8 +13440,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const key = `${gx}_${gz}`;
         if (!grid.has(key)) {
           grid.set(key, new THREE.Vector3(
-            pos.getX(i) + mesh.position.x, wy,
-            pos.getZ(i) + mesh.position.z
+            worldPoint.x, worldPoint.y, worldPoint.z
           ));
         }
         contactCount++;
@@ -13508,4 +13825,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
 }); // end DOMContentLoaded
-</script></body></html>
+
+</script>
+</body>
+</html>

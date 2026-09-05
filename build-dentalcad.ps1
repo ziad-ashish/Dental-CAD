@@ -9,8 +9,8 @@
 #  - Write output with WriteAllText using UTF8 without BOM
 
 $ErrorActionPreference = 'Stop'
-$baseDir   = 'C:\Users\user\Downloads\New folder'
-$origFile  = 'C:\Users\user\Downloads\original-extract\New folder\DentalCAD.html'
+$baseDir   = Split-Path -Parent $MyInvocation.MyCommand.Path
+$origFile  = Join-Path $baseDir 'DentalCAD.html'
 $srcDir    = "$baseDir\dentalcad-web"
 $outFile   = "$baseDir\DentalCAD.html"
 
@@ -34,8 +34,8 @@ Write-Host "    Created source directories"
 # PHASE 2: Extract CSS
 # ─────────────────────────────────────────────────────────────
 Write-Host "`n[2] Extracting CSS..." -ForegroundColor Yellow
-$cssOpenTag  = "<style>`n"
-$cssCloseTag = "`n</style>"
+$cssOpenTag  = '<style>'
+$cssCloseTag = '</style>'
 $cssStart = $src.IndexOf($cssOpenTag)
 if ($cssStart -lt 0) { throw "Cannot find <style> tag" }
 $cssContentStart = $cssStart + $cssOpenTag.Length
@@ -49,16 +49,12 @@ Write-Host "    Wrote style.css  ($($cssText.Length) chars)"
 # PHASE 3: Extract HTML body
 # ─────────────────────────────────────────────────────────────
 Write-Host "`n[3] Extracting HTML body..." -ForegroundColor Yellow
-# Find <body> tag
-$bodyOpen = "`n<body>`n"
-$bodyStart = $src.IndexOf($bodyOpen)
-if ($bodyStart -lt 0) {
-    # try without leading newline
-    $bodyOpen = "<body>`n"
-    $bodyStart = $src.IndexOf($bodyOpen)
-}
+# Find <body> tag (works for minified and pretty-printed HTML)
+$bodyStart = $src.IndexOf('<body')
 if ($bodyStart -lt 0) { throw "Cannot find <body> tag" }
-$bodyContentStart = $bodyStart + $bodyOpen.Length
+$bodyTagEnd = $src.IndexOf('>', $bodyStart)
+if ($bodyTagEnd -lt 0) { throw "Cannot close <body> tag" }
+$bodyContentStart = $bodyTagEnd + 1
 
 # Find the scripts section start (the cdnjs three.js script tag)
 $scriptsMarker = '<script src="https://cdnjs'
@@ -94,12 +90,12 @@ Write-Host "    HTML body extracted  ($($htmlBody.Length) chars)"
 Write-Host "`n[4] Extracting JS modules..." -ForegroundColor Yellow
 
 # Find the inline <script> block (after the cdnjs script tag)
-$inlineScriptOpen = "`n<script>`n"
+$inlineScriptOpen = '<script>'
 $inlineStart = $src.IndexOf($inlineScriptOpen, $scriptsPos)
 if ($inlineStart -lt 0) { throw "Cannot find inline <script> block" }
 $jsBlockStart = $inlineStart + $inlineScriptOpen.Length
 
-$inlineScriptClose = "`n</script>"
+$inlineScriptClose = '</script>'
 $jsBlockEnd = $src.IndexOf($inlineScriptClose, $jsBlockStart)
 if ($jsBlockEnd -lt 0) { throw "Cannot find </script> close" }
 
@@ -119,81 +115,26 @@ Write-Host "    JS block: $($jsBlock.Length) chars"
 # etc.
 
 $modMarkers = @(
-    [PSCustomObject]@{ name='stl-parser';   start=''; end='// === project-io.js ===' }
-    [PSCustomObject]@{ name='project-io';   start='// === project-io.js ==='; end='// === undo-redo.js ===' }
-    [PSCustomObject]@{ name='undo-redo';    start='// === undo-redo.js ==='; end='// === logger.js ===' }
-    [PSCustomObject]@{ name='logger';       start='// === logger.js ==='; end='// === analysis.js ===' }
-    [PSCustomObject]@{ name='analysis';     start='// === analysis.js ==='; end='// === manufacturing.js ===' }
-    [PSCustomObject]@{ name='manufacturing';start='// === manufacturing.js ==='; end='// === tools.js ===' }
-    [PSCustomObject]@{ name='tools';        start='// === tools.js ==='; end='// === viewport.js ===' }
-    [PSCustomObject]@{ name='viewport';     start='// === viewport.js ==='; end='// === dental-chart.js ===' }
-    [PSCustomObject]@{ name='dental-chart'; start='// === dental-chart.js ==='; end='// === wizard.js ===' }
-    [PSCustomObject]@{ name='wizard';       start='// === wizard.js ==='; end='// === app.js ===' }
-    [PSCustomObject]@{ name='app';          start='// === app.js ==='; end='' }
+    [PSCustomObject]@{ name='stl-parser';   start='/* === stl-parser === */'; end='/* === project-io === */' }
+    [PSCustomObject]@{ name='project-io';   start='/* === project-io === */'; end='/* === undo-redo === */' }
+    [PSCustomObject]@{ name='undo-redo';    start='/* === undo-redo === */'; end='/* === logger === */' }
+    [PSCustomObject]@{ name='logger';       start='/* === logger === */'; end='/* === analysis === */' }
+    [PSCustomObject]@{ name='analysis';     start='/* === analysis === */'; end='/* === manufacturing === */' }
+    [PSCustomObject]@{ name='manufacturing';start='/* === manufacturing === */'; end='/* === tools === */' }
+    [PSCustomObject]@{ name='tools';        start='/* === tools === */'; end='/* === viewport === */' }
+    [PSCustomObject]@{ name='viewport';     start='/* === viewport === */'; end='/* === dental-chart === */' }
+    [PSCustomObject]@{ name='dental-chart'; start='/* === dental-chart === */'; end='/* === wizard === */' }
+    [PSCustomObject]@{ name='wizard';       start='/* === wizard === */'; end='/* === app === */' }
+    [PSCustomObject]@{ name='app';          start='/* === app === */'; end='' }
 )
 
-foreach ($mod in $modMarkers) {
-    # Determine content start
-    if ($mod.start -eq '') {
-        # First module — starts from beginning of jsBlock
-        $modFrom = 0
-    } else {
-        $markerPos = $jsBlock.IndexOf($mod.start)
-        if ($markerPos -lt 0) { throw "Cannot find marker: '$($mod.start)'" }
-        # Content starts after the marker line
-        $afterMarker = $jsBlock.IndexOf("`n", $markerPos)
-        $modFrom = if ($afterMarker -ge 0) { $afterMarker + 1 } else { $markerPos + $mod.start.Length }
-    }
-
-    # Determine content end
-    if ($mod.end -eq '') {
-        # Last module — ends at end of jsBlock
-        $modTo = $jsBlock.Length
-    } else {
-        $endMarkerPos = $jsBlock.IndexOf($mod.end)
-        if ($endMarkerPos -lt 0) { throw "Cannot find end marker: '$($mod.end)'" }
-        $modTo = $endMarkerPos
-    }
-
-    $modContent = $jsBlock.Substring($modFrom, $modTo - $modFrom).Trim()
-    $modPath = "$srcDir\js\$($mod.name).js"
-    [System.IO.File]::WriteAllText($modPath, $modContent, [System.Text.UTF8Encoding]::new($false))
-    Write-Host "    Wrote $($mod.name).js  ($($modContent.Length) chars)"
-}
+Write-Host "    Modular source extraction skipped; source files are authoritative." -ForegroundColor DarkGray
 
 # ─────────────────────────────────────────────────────────────
 # PHASE 5: Build index.html source file
 # ─────────────────────────────────────────────────────────────
-Write-Host "`n[5] Writing index.html..." -ForegroundColor Yellow
-$indexSb = [System.Text.StringBuilder]::new()
-[void]$indexSb.AppendLine('<!DOCTYPE html>')
-[void]$indexSb.AppendLine('<html lang="en">')
-[void]$indexSb.AppendLine('<head>')
-[void]$indexSb.AppendLine('<meta charset="UTF-8"/>')
-[void]$indexSb.AppendLine('<meta name="viewport" content="width=device-width,initial-scale=1.0"/>')
-[void]$indexSb.AppendLine('<title>DentalCAD ' + [char]0x2014 + ' Dental Design System</title>')
-[void]$indexSb.AppendLine('<link rel="stylesheet" href="css/style.css"/>')
-[void]$indexSb.AppendLine('</head>')
-[void]$indexSb.AppendLine('<body>')
-[void]$indexSb.AppendLine($htmlBody)
-[void]$indexSb.AppendLine('')
-[void]$indexSb.AppendLine('<!-- ── Scripts ──────────────────────────────────────────────── -->')
-[void]$indexSb.AppendLine('<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>')
-[void]$indexSb.AppendLine('<script src="js/stl-parser.js"></script>')
-[void]$indexSb.AppendLine('<script src="js/project-io.js"></script>')
-[void]$indexSb.AppendLine('<script src="js/undo-redo.js"></script>')
-[void]$indexSb.AppendLine('<script src="js/logger.js"></script>')
-[void]$indexSb.AppendLine('<script src="js/analysis.js"></script>')
-[void]$indexSb.AppendLine('<script src="js/manufacturing.js"></script>')
-[void]$indexSb.AppendLine('<script src="js/tools.js"></script>')
-[void]$indexSb.AppendLine('<script src="js/viewport.js"></script>')
-[void]$indexSb.AppendLine('<script src="js/dental-chart.js"></script>')
-[void]$indexSb.AppendLine('<script src="js/wizard.js"></script>')
-[void]$indexSb.AppendLine('<script src="js/app.js"></script>')
-[void]$indexSb.AppendLine('</body>')
-[void]$indexSb.Append('</html>')
-[System.IO.File]::WriteAllText("$srcDir\index.html", $indexSb.ToString(), [System.Text.UTF8Encoding]::new($false))
-Write-Host "    Wrote index.html"
+Write-Host "`n[5] Preserving modular index.html source..." -ForegroundColor Yellow
+if (-not (Test-Path "$srcDir\index.html")) { throw "Missing modular index.html" }
 
 # ─────────────────────────────────────────────────────────────
 # PHASE 6: Re-read source files and assemble the combined HTML
