@@ -1,0 +1,11 @@
+{
+  "name": "dentalcad",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": ["desktop"],
+  "scripts": {
+    "start": "npm --prefix desktop start",
+    "desktop:install": "npm --prefix desktop install",
+    "desktop:start": "npm --prefix desktop start"
+  }
+}

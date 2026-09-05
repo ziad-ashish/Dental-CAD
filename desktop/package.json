@@ -1,0 +1,14 @@
+{
+  "name": "dentalcad-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "DentalCAD desktop application shell",
+  "main": "main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^31.7.7"
+  }
+}

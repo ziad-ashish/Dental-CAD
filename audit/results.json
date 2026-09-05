@@ -32,11 +32,27 @@
     "status": "PASS"
   },
   {
+    "name": "Folder watch validates polling interval and supports PLY",
+    "status": "PASS"
+  },
+  {
     "name": "Bundled HTML contains every authoritative module marker",
     "status": "PASS"
   },
   {
     "name": "Build script preserves modular CSS source",
+    "status": "PASS"
+  },
+  {
+    "name": "Desktop shell opens DentalCAD as an isolated application",
+    "status": "PASS"
+  },
+  {
+    "name": "Python entry point launches the desktop shell",
+    "status": "PASS"
+  },
+  {
+    "name": "Git ignores generated desktop dependencies and Python bytecode",
     "status": "PASS"
   },
   {

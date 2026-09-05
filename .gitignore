@@ -1,0 +1,14 @@
+# Installed JavaScript dependencies and Electron binaries are generated locally.
+node_modules/
+desktop/node_modules/
+
+# Python bytecode and local virtual environments.
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Local editor and OS files.
+.vscode/
+.idea/
+*.log
