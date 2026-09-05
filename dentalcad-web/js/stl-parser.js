@@ -26,6 +26,8 @@
  */
 
 const STLParser = (() => {
+  const MAX_SCAN_BYTES = 512 * 1024 * 1024;
+  const MAX_TRIANGLES = 10_000_000;
 
   // ═══════════════════════════════════════════════════════════
   // PARSE — Binary STL
@@ -345,6 +347,11 @@ const STLParser = (() => {
   // ═══════════════════════════════════════════════════════════
   async function parseFile(file) {
     return new Promise((resolve, reject) => {
+      const declaredSize = Number(file?.size);
+      if (Number.isFinite(declaredSize) && declaredSize > MAX_SCAN_BYTES) {
+        reject(new Error(`Scan file exceeds the ${MAX_SCAN_BYTES / (1024 * 1024)} MB safety limit`));
+        return;
+      }
       const reader = new FileReader();
       reader.onload = (e) => {
         try {
@@ -369,6 +376,10 @@ const STLParser = (() => {
 
           if (!parsed.triCount || !parsed.positions.length) {
             reject(new Error('Mesh contains no triangles'));
+            return;
+          }
+          if (parsed.triCount > MAX_TRIANGLES) {
+            reject(new Error(`Mesh exceeds the ${MAX_TRIANGLES.toLocaleString()} triangle safety limit`));
             return;
           }
           const result = _buildGeometry(parsed, file.size);
@@ -399,10 +410,11 @@ const STLParser = (() => {
     if (!geo?.getAttribute) throw new Error('A mesh geometry is required for export');
     if (!Number.isFinite(outputScale) || outputScale <= 0) throw new Error('Export scale must be positive');
     const posAttr  = geo.getAttribute('position');
-    if (!posAttr?.count || posAttr.count % 3 !== 0) throw new Error('Mesh must contain complete triangles for export');
+    const indexAttr = geo.getIndex?.() || null;
+    if (!posAttr?.count || (indexAttr ? indexAttr.count % 3 !== 0 : posAttr.count % 3 !== 0)) throw new Error('Mesh must contain complete triangles for export');
     for (let i = 0; i < posAttr.array.length; i++) if (!Number.isFinite(posAttr.array[i])) throw new Error('Mesh contains non-finite coordinates');
     const normAttr = geo.getAttribute('normal');
-    const vCount   = posAttr.count;
+    const vCount   = indexAttr ? indexAttr.count : posAttr.count;
     const triCount = Math.floor(vCount / 3);
 
     // Reverse the viewport normalisation
@@ -417,14 +429,16 @@ const STLParser = (() => {
     const nor = new Float32Array(vCount * 3);
 
     for (let i = 0; i < vCount; i++) {
-      pos[i*3]   = posAttr.getX(i) * invScale + off.x * outputScale;
-      pos[i*3+1] = posAttr.getY(i) * invScale + off.y * outputScale;
-      pos[i*3+2] = posAttr.getZ(i) * invScale + off.z * outputScale;
+      const sourceIndex = indexAttr ? indexAttr.getX(i) : i;
+      if (!Number.isInteger(sourceIndex) || sourceIndex < 0 || sourceIndex >= posAttr.count) throw new Error('Mesh index references missing vertex');
+      pos[i*3]   = posAttr.getX(sourceIndex) * invScale + off.x * outputScale;
+      pos[i*3+1] = posAttr.getY(sourceIndex) * invScale + off.y * outputScale;
+      pos[i*3+2] = posAttr.getZ(sourceIndex) * invScale + off.z * outputScale;
 
       if (normAttr) {
-        nor[i*3]   = normAttr.getX(i);
-        nor[i*3+1] = normAttr.getY(i);
-        nor[i*3+2] = normAttr.getZ(i);
+        nor[i*3]   = normAttr.getX(sourceIndex);
+        nor[i*3+1] = normAttr.getY(sourceIndex);
+        nor[i*3+2] = normAttr.getZ(sourceIndex);
       }
     }
 
@@ -802,6 +816,7 @@ const STLParser = (() => {
   // PUBLIC API
   // ═══════════════════════════════════════════════════════════
   return {
+    LIMITS: Object.freeze({ MAX_SCAN_BYTES, MAX_TRIANGLES }),
     parseFile,
     exportBinarySTL,
     exportASCIISTL,

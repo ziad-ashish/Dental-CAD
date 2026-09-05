@@ -4637,6 +4637,8 @@ html, body {
  */
 
 const STLParser = (() => {
+  const MAX_SCAN_BYTES = 512 * 1024 * 1024;
+  const MAX_TRIANGLES = 10_000_000;
 
   // ═══════════════════════════════════════════════════════════
   // PARSE — Binary STL
@@ -4956,6 +4958,11 @@ const STLParser = (() => {
   // ═══════════════════════════════════════════════════════════
   async function parseFile(file) {
     return new Promise((resolve, reject) => {
+      const declaredSize = Number(file?.size);
+      if (Number.isFinite(declaredSize) && declaredSize > MAX_SCAN_BYTES) {
+        reject(new Error(`Scan file exceeds the ${MAX_SCAN_BYTES / (1024 * 1024)} MB safety limit`));
+        return;
+      }
       const reader = new FileReader();
       reader.onload = (e) => {
         try {
@@ -4980,6 +4987,10 @@ const STLParser = (() => {
 
           if (!parsed.triCount || !parsed.positions.length) {
             reject(new Error('Mesh contains no triangles'));
+            return;
+          }
+          if (parsed.triCount > MAX_TRIANGLES) {
+            reject(new Error(`Mesh exceeds the ${MAX_TRIANGLES.toLocaleString()} triangle safety limit`));
             return;
           }
           const result = _buildGeometry(parsed, file.size);
@@ -5010,10 +5021,11 @@ const STLParser = (() => {
     if (!geo?.getAttribute) throw new Error('A mesh geometry is required for export');
     if (!Number.isFinite(outputScale) || outputScale <= 0) throw new Error('Export scale must be positive');
     const posAttr  = geo.getAttribute('position');
-    if (!posAttr?.count || posAttr.count % 3 !== 0) throw new Error('Mesh must contain complete triangles for export');
+    const indexAttr = geo.getIndex?.() || null;
+    if (!posAttr?.count || (indexAttr ? indexAttr.count % 3 !== 0 : posAttr.count % 3 !== 0)) throw new Error('Mesh must contain complete triangles for export');
     for (let i = 0; i < posAttr.array.length; i++) if (!Number.isFinite(posAttr.array[i])) throw new Error('Mesh contains non-finite coordinates');
     const normAttr = geo.getAttribute('normal');
-    const vCount   = posAttr.count;
+    const vCount   = indexAttr ? indexAttr.count : posAttr.count;
     const triCount = Math.floor(vCount / 3);
 
     // Reverse the viewport normalisation
@@ -5028,14 +5040,16 @@ const STLParser = (() => {
     const nor = new Float32Array(vCount * 3);
 
     for (let i = 0; i < vCount; i++) {
-      pos[i*3]   = posAttr.getX(i) * invScale + off.x * outputScale;
-      pos[i*3+1] = posAttr.getY(i) * invScale + off.y * outputScale;
-      pos[i*3+2] = posAttr.getZ(i) * invScale + off.z * outputScale;
+      const sourceIndex = indexAttr ? indexAttr.getX(i) : i;
+      if (!Number.isInteger(sourceIndex) || sourceIndex < 0 || sourceIndex >= posAttr.count) throw new Error('Mesh index references missing vertex');
+      pos[i*3]   = posAttr.getX(sourceIndex) * invScale + off.x * outputScale;
+      pos[i*3+1] = posAttr.getY(sourceIndex) * invScale + off.y * outputScale;
+      pos[i*3+2] = posAttr.getZ(sourceIndex) * invScale + off.z * outputScale;
 
       if (normAttr) {
-        nor[i*3]   = normAttr.getX(i);
-        nor[i*3+1] = normAttr.getY(i);
-        nor[i*3+2] = normAttr.getZ(i);
+        nor[i*3]   = normAttr.getX(sourceIndex);
+        nor[i*3+1] = normAttr.getY(sourceIndex);
+        nor[i*3+2] = normAttr.getZ(sourceIndex);
       }
     }
 
@@ -5413,6 +5427,7 @@ const STLParser = (() => {
   // PUBLIC API
   // ═══════════════════════════════════════════════════════════
   return {
+    LIMITS: Object.freeze({ MAX_SCAN_BYTES, MAX_TRIANGLES }),
     parseFile,
     exportBinarySTL,
     exportASCIISTL,
@@ -5426,6 +5441,71 @@ const STLParser = (() => {
     formatBytes,
   };
 })();
+
+// === mesh-repair.js ===
+/**
+ * mesh-repair.js — deterministic triangle-mesh cleanup utilities.
+ *
+ * This is a conservative surface cleanup pass. It does not invent missing
+ * anatomy or fill holes; it removes duplicate vertices/faces and degenerate
+ * triangles while preserving the represented surface.
+ */
+const MeshRepair = (() => {
+  function _position(geometry) {
+    const attr = geometry?.getAttribute?.('position');
+    if (!attr?.count || attr.count % 3 !== 0) throw new Error('Mesh must contain complete triangles');
+    for (const value of attr.array) if (!Number.isFinite(value)) throw new Error('Mesh contains non-finite coordinates');
+    return attr;
+  }
+
+  function analyze(geometry, opts = {}) {
+    const pos = _position(geometry);
+    const tolerance = Number(opts.tolerance ?? 1e-5);
+    const areaEpsilon = Number(opts.areaEpsilon ?? 1e-12);
+    if (!Number.isFinite(tolerance) || tolerance <= 0 || !Number.isFinite(areaEpsilon) || areaEpsilon < 0) throw new Error('Invalid mesh repair tolerances');
+    const seen = new Set();
+    let degenerateTriangles = 0, duplicateFaces = 0;
+    const key = (x, y, z) => `${Math.round(x / tolerance)},${Math.round(y / tolerance)},${Math.round(z / tolerance)}`;
+    const vertices = new Map();
+    const point = i => [pos.getX(i), pos.getY(i), pos.getZ(i)];
+    for (let i = 0; i < pos.count; i += 3) {
+      const ids = [i, i + 1, i + 2].map(v => { const p = point(v), k = key(...p); if (!vertices.has(k)) vertices.set(k, vertices.size); return vertices.get(k); });
+      if (new Set(ids).size < 3) { degenerateTriangles++; continue; }
+      const a = new THREE.Vector3(...point(i)), b = new THREE.Vector3(...point(i + 1)), c = new THREE.Vector3(...point(i + 2));
+      if (b.clone().sub(a).cross(c.clone().sub(a)).lengthSq() <= areaEpsilon) { degenerateTriangles++; continue; }
+      const face = ids.slice().sort((x, y) => x - y).join(':');
+      if (seen.has(face)) duplicateFaces++; else seen.add(face);
+    }
+    return { vertexCount: pos.count, uniqueVertexCount: vertices.size, triangleCount: pos.count / 3, degenerateTriangles, duplicateFaces, tolerance, areaEpsilon };
+  }
+
+  function repair(geometry, opts = {}) {
+    const pos = _position(geometry);
+    const tolerance = Number(opts.tolerance ?? 1e-5);
+    const areaEpsilon = Number(opts.areaEpsilon ?? 1e-12);
+    if (!Number.isFinite(tolerance) || tolerance <= 0 || !Number.isFinite(areaEpsilon) || areaEpsilon < 0) throw new Error('Invalid mesh repair tolerances');
+    const representatives = new Map(), sums = [], counts = [], indices = [], faces = new Set();
+    const key = (x, y, z) => `${Math.round(x / tolerance)},${Math.round(y / tolerance)},${Math.round(z / tolerance)}`;
+    const vertexId = (x, y, z) => { const k = key(x, y, z); let id = representatives.get(k); if (id == null) { id = sums.length; representatives.set(k, id); sums.push([x, y, z]); counts.push(1); } else { sums[id][0] += x; sums[id][1] += y; sums[id][2] += z; counts[id]++; } return id; };
+    let removedDegenerate = 0, removedDuplicateFaces = 0;
+    for (let i = 0; i < pos.count; i += 3) {
+      const ids = [0, 1, 2].map(j => vertexId(pos.getX(i + j), pos.getY(i + j), pos.getZ(i + j)));
+      const a = new THREE.Vector3(pos.getX(i), pos.getY(i), pos.getZ(i)), b = new THREE.Vector3(pos.getX(i + 1), pos.getY(i + 1), pos.getZ(i + 1)), c = new THREE.Vector3(pos.getX(i + 2), pos.getY(i + 2), pos.getZ(i + 2));
+      const face = ids.slice().sort((x, y) => x - y).join(':');
+      if (new Set(ids).size < 3 || b.clone().sub(a).cross(c.clone().sub(a)).lengthSq() <= areaEpsilon) { removedDegenerate++; continue; }
+      if (faces.has(face)) { removedDuplicateFaces++; continue; }
+      faces.add(face); indices.push(...ids);
+    }
+    const vertices = new Float32Array(sums.length * 3);
+    sums.forEach((p, i) => { vertices[i * 3] = p[0] / counts[i]; vertices[i * 3 + 1] = p[1] / counts[i]; vertices[i * 3 + 2] = p[2] / counts[i]; });
+    const out = new THREE.BufferGeometry(); out.setAttribute('position', new THREE.BufferAttribute(vertices, 3)); out.setIndex(indices); out.computeVertexNormals();
+    out.userData = { ...(geometry.userData || {}), meshRepair: { tolerance, areaEpsilon } };
+    return { geometry: out, report: { inputVertices: pos.count, inputTriangles: pos.count / 3, outputVertices: sums.length, outputTriangles: indices.length / 3, weldedVertices: pos.count - sums.length, removedDegenerate, removedDuplicateFaces, changed: pos.count !== sums.length || removedDegenerate > 0 || removedDuplicateFaces > 0 } };
+  }
+
+  return { analyze, repair };
+})();
+window.MeshRepair = MeshRepair;
 
 // === project-io.js ===
 /**
@@ -5626,8 +5706,31 @@ const ProjectIO = (() => {
     return project;
   }
 
+  // Native Electron Save As. Browser builds keep using the download fallback.
+  async function saveAs(caseData, geometry = null, extraData = {}) {
+    const project = _buildProject(caseData, geometry, extraData);
+    const json = JSON.stringify(project, null, 2);
+    const safeId = (caseData.caseId || 'Case').replace(/[^a-z0-9_\-]/gi, '_');
+    const api = window.dentalcadDesktop;
+    if (!api?.saveProject) return save(caseData, geometry, extraData);
+    const result = await api.saveProject({ defaultPath: `DentalCAD_${safeId}.dcad`, contents: json });
+    if (result?.canceled) throw new Error('Save cancelled');
+    _lastSaved = project.savedAt;
+    markClean();
+    _addToRecent({ caseId: caseData.caseId, patient: caseData.patient, savedAt: project.savedAt, filename: result.filePath || `DentalCAD_${safeId}.dcad` });
+    return project;
+  }
+
   // ── Load (file picker) ────────────────────────────────────
   function load() {
+    const desktop = window.dentalcadDesktop;
+    if (desktop?.openProject) {
+      return desktop.openProject().then(result => {
+        if (result?.canceled) throw new Error('No file selected');
+        try { return _parseProject(JSON.parse(result.contents)); }
+        catch (err) { throw new Error(`Invalid .dcad: ${err.message}`); }
+      });
+    }
     return new Promise((resolve, reject) => {
       const input = document.createElement('input');
       input.type  = 'file';
@@ -5863,7 +5966,7 @@ const ProjectIO = (() => {
   }
 
   return {
-    save, load, loadFile,
+    save, saveAs, load, loadFile,
     autoSave, loadAutoSave, clearAutoSave, hasAutoSave,
     getRecentFiles, clearRecentFiles,
     exportMesh,
@@ -12191,8 +12294,8 @@ document.addEventListener('DOMContentLoaded', () => {
     switch (action) {
       case 'new-case':      _newCase();          break;
       case 'open-case':     _openCase();         break;
-      case 'save':          _saveProject();      break;
-      case 'save-as':       _saveProject();      break;
+      case 'save':          _saveProject(false); break;
+      case 'save-as':       _saveProject(true);  break;
       case 'recent-files':  _openRecentModal();  break;
       case 'import-scan':   Wizard.goTo(1);      break;
       case 'export':        Wizard.goTo(6);      break;
@@ -12428,7 +12531,12 @@ document.addEventListener('DOMContentLoaded', () => {
     _showScanProgress('Parsing ' + file.name + '…');
 
     try {
-      const { geometry, stats } = await STLParser.parseFile(file);
+      let { geometry, stats } = await STLParser.parseFile(file);
+      if (window.MeshRepair) {
+        const repaired = MeshRepair.repair(geometry, { tolerance: 1e-5 });
+        geometry = repaired.geometry;
+        stats = { ...stats, vertices: geometry.getAttribute('position').count, triangles: geometry.index ? geometry.index.count / 3 : geometry.getAttribute('position').count / 3, meshRepair: repaired.report };
+      }
       geometry.userData.stats = stats;
       state.meshStats = stats;
       Viewport.loadGeometry(geometry, stats);
@@ -12822,17 +12930,22 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 0);
   }
 
-  function _saveProject() {
+  async function _saveProject(saveAs = false) {
     const data = Wizard.getData();
     // Collect margin line points from the active tool
     const ml = { points: Tools.MarginLineTool.getPoints(), closed: Tools.MarginLineTool.isClosed() };
     // Include which wizard step we're on
     data.wizardStep = Wizard.getStep();
     const geo = Viewport.getCurrentGeometry();
-    ProjectIO.save(data, geo, { marginLine: ml, implantPlan: _getImplantPlanSnapshot?.() });
-    document.title = document.title.replace(/^• /, '');
-    document.getElementById('unsaved-indicator')?.classList.add('hidden');
-    setMsg(`✔ Project saved: DentalCAD_${(data.caseId||'Case').replace(/[^a-z0-9_\-]/gi,'_')}.dcad`);
+    try {
+      if (saveAs) await ProjectIO.saveAs(data, geo, { marginLine: ml, implantPlan: _getImplantPlanSnapshot?.() });
+      else ProjectIO.save(data, geo, { marginLine: ml, implantPlan: _getImplantPlanSnapshot?.() });
+      document.title = document.title.replace(/^• /, '');
+      document.getElementById('unsaved-indicator')?.classList.add('hidden');
+      setMsg(`✔ Project saved: DentalCAD_${(data.caseId||'Case').replace(/[^a-z0-9_\-]/gi,'_')}.dcad`);
+    } catch (err) {
+      if (err.message !== 'Save cancelled') setMsg(`⚠ Could not save: ${err.message}`, 4500);
+    }
   }
 
   async function _openCase() {

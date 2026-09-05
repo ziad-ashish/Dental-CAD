@@ -8,6 +8,10 @@
     "status": "PASS"
   },
   {
+    "name": "Scan import runs mesh repair and preserves its report",
+    "status": "PASS"
+  },
+  {
     "name": "Nesting export is gated by blank-fit validation",
     "status": "PASS"
   },
@@ -48,11 +52,19 @@
     "status": "PASS"
   },
   {
+    "name": "Desktop shell provides native project dialogs with browser fallback",
+    "status": "PASS"
+  },
+  {
     "name": "Python entry point launches the desktop shell",
     "status": "PASS"
   },
   {
     "name": "Git ignores generated desktop dependencies and Python bytecode",
+    "status": "PASS"
+  },
+  {
+    "name": "Developer README and CI document the supported workflow",
     "status": "PASS"
   },
   {
@@ -73,6 +85,10 @@
   },
   {
     "name": "Syntax manufacturing.js",
+    "status": "PASS"
+  },
+  {
+    "name": "Syntax mesh-repair.js",
     "status": "PASS"
   },
   {
@@ -132,6 +148,10 @@
     "status": "PASS"
   },
   {
+    "name": "Scan parser rejects oversized input before reading it",
+    "status": "PASS"
+  },
+  {
     "name": "Empty STL rejected",
     "status": "PASS"
   },
@@ -149,6 +169,14 @@
   },
   {
     "name": "Mesh exporters reject incomplete and non-finite geometry",
+    "status": "PASS"
+  },
+  {
+    "name": "Mesh repair welds duplicates and removes bad faces",
+    "status": "PASS"
+  },
+  {
+    "name": "Indexed repaired geometry exports without losing triangles",
     "status": "PASS"
   },
   {

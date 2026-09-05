@@ -451,8 +451,8 @@ document.addEventListener('DOMContentLoaded', () => {
     switch (action) {
       case 'new-case':      _newCase();          break;
       case 'open-case':     _openCase();         break;
-      case 'save':          _saveProject();      break;
-      case 'save-as':       _saveProject();      break;
+      case 'save':          _saveProject(false); break;
+      case 'save-as':       _saveProject(true);  break;
       case 'recent-files':  _openRecentModal();  break;
       case 'import-scan':   Wizard.goTo(1);      break;
       case 'export':        Wizard.goTo(6);      break;
@@ -688,7 +688,12 @@ document.addEventListener('DOMContentLoaded', () => {
     _showScanProgress('Parsing ' + file.name + '…');
 
     try {
-      const { geometry, stats } = await STLParser.parseFile(file);
+      let { geometry, stats } = await STLParser.parseFile(file);
+      if (window.MeshRepair) {
+        const repaired = MeshRepair.repair(geometry, { tolerance: 1e-5 });
+        geometry = repaired.geometry;
+        stats = { ...stats, vertices: geometry.getAttribute('position').count, triangles: geometry.index ? geometry.index.count / 3 : geometry.getAttribute('position').count / 3, meshRepair: repaired.report };
+      }
       geometry.userData.stats = stats;
       state.meshStats = stats;
       Viewport.loadGeometry(geometry, stats);
@@ -1082,17 +1087,22 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 0);
   }
 
-  function _saveProject() {
+  async function _saveProject(saveAs = false) {
     const data = Wizard.getData();
     // Collect margin line points from the active tool
     const ml = { points: Tools.MarginLineTool.getPoints(), closed: Tools.MarginLineTool.isClosed() };
     // Include which wizard step we're on
     data.wizardStep = Wizard.getStep();
     const geo = Viewport.getCurrentGeometry();
-    ProjectIO.save(data, geo, { marginLine: ml, implantPlan: _getImplantPlanSnapshot?.() });
-    document.title = document.title.replace(/^• /, '');
-    document.getElementById('unsaved-indicator')?.classList.add('hidden');
-    setMsg(`✔ Project saved: DentalCAD_${(data.caseId||'Case').replace(/[^a-z0-9_\-]/gi,'_')}.dcad`);
+    try {
+      if (saveAs) await ProjectIO.saveAs(data, geo, { marginLine: ml, implantPlan: _getImplantPlanSnapshot?.() });
+      else ProjectIO.save(data, geo, { marginLine: ml, implantPlan: _getImplantPlanSnapshot?.() });
+      document.title = document.title.replace(/^• /, '');
+      document.getElementById('unsaved-indicator')?.classList.add('hidden');
+      setMsg(`✔ Project saved: DentalCAD_${(data.caseId||'Case').replace(/[^a-z0-9_\-]/gi,'_')}.dcad`);
+    } catch (err) {
+      if (err.message !== 'Save cancelled') setMsg(`⚠ Could not save: ${err.message}`, 4500);
+    }
   }
 
   async function _openCase() {

@@ -1,6 +1,6 @@
 # DentalCAD Desktop
 
-This folder is the Electron desktop shell for the DentalCAD renderer. The application opens `dentalcad-web/index.html` in a native window, with Node integration disabled and navigation restricted to local files.
+This folder is the Electron desktop shell for the DentalCAD renderer. The application opens `dentalcad-web/index.html` in a native window, with Node integration disabled and navigation restricted to local files. The preload exposes only native project open/save dialogs through IPC; it does not expose filesystem or Node APIs to the renderer.
 
 From this folder:
 

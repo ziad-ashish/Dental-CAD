@@ -4,6 +4,8 @@
   "private": true,
   "workspaces": ["desktop"],
   "scripts": {
+    "audit": "node audit/test.cjs",
+    "build": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\build-dentalcad.ps1",
     "start": "npm --prefix desktop start",
     "desktop:install": "npm --prefix desktop install",
     "desktop:start": "npm --prefix desktop start"

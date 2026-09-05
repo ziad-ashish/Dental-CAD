@@ -196,8 +196,31 @@ const ProjectIO = (() => {
     return project;
   }
 
+  // Native Electron Save As. Browser builds keep using the download fallback.
+  async function saveAs(caseData, geometry = null, extraData = {}) {
+    const project = _buildProject(caseData, geometry, extraData);
+    const json = JSON.stringify(project, null, 2);
+    const safeId = (caseData.caseId || 'Case').replace(/[^a-z0-9_\-]/gi, '_');
+    const api = window.dentalcadDesktop;
+    if (!api?.saveProject) return save(caseData, geometry, extraData);
+    const result = await api.saveProject({ defaultPath: `DentalCAD_${safeId}.dcad`, contents: json });
+    if (result?.canceled) throw new Error('Save cancelled');
+    _lastSaved = project.savedAt;
+    markClean();
+    _addToRecent({ caseId: caseData.caseId, patient: caseData.patient, savedAt: project.savedAt, filename: result.filePath || `DentalCAD_${safeId}.dcad` });
+    return project;
+  }
+
   // ── Load (file picker) ────────────────────────────────────
   function load() {
+    const desktop = window.dentalcadDesktop;
+    if (desktop?.openProject) {
+      return desktop.openProject().then(result => {
+        if (result?.canceled) throw new Error('No file selected');
+        try { return _parseProject(JSON.parse(result.contents)); }
+        catch (err) { throw new Error(`Invalid .dcad: ${err.message}`); }
+      });
+    }
     return new Promise((resolve, reject) => {
       const input = document.createElement('input');
       input.type  = 'file';
@@ -433,7 +456,7 @@ const ProjectIO = (() => {
   }
 
   return {
-    save, load, loadFile,
+    save, saveAs, load, loadFile,
     autoSave, loadAutoSave, clearAutoSave, hasAutoSave,
     getRecentFiles, clearRecentFiles,
     exportMesh,

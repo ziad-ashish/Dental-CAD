@@ -1,6 +1,7 @@
 # Installed JavaScript dependencies and Electron binaries are generated locally.
 node_modules/
 desktop/node_modules/
+.npm-cache/
 
 # Python bytecode and local virtual environments.
 __pycache__/
