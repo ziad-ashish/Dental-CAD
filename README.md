@@ -23,6 +23,8 @@ The first command installs the Electron dependency. The second opens DentalCAD i
 python main.py
 ```
 
+`main.py` loads the modular renderer directly from `dentalcad-web/index.html`, so UI changes appear immediately; rebuilding `DentalCAD.html` is only needed when you want the standalone bundled HTML file.
+
 On Windows, `DentalCAD.bat` can be double-clicked after the dependencies are installed. `npm start` and the Python launcher both use the same `desktop/main.cjs` shell and `dentalcad-web/index.html` renderer.
 
 ## Build the distributable HTML bundle

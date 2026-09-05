@@ -2225,6 +2225,63 @@ html, body {
   .step-label { display: none; }
 }
 
+/* Electron owns a resizable desktop window with an enforced 1100px minimum.
+   Keep the two docks in the normal three-column layout even when Windows
+   reports a reduced CSS viewport because of display scaling.  Without this
+   override the tablet drawer rules can move Properties off-screen. */
+html[data-desktop="electron"] #main-body {
+  display: flex;
+  overflow: hidden;
+}
+html[data-desktop="electron"] #left-dock,
+html[data-desktop="electron"] #right-dock {
+  position: relative;
+  inset: auto;
+  top: auto;
+  right: auto;
+  bottom: auto;
+  left: auto;
+  z-index: auto;
+  transform: none !important;
+  width: 240px !important;
+  min-width: 240px !important;
+  max-width: 240px !important;
+  height: auto;
+  box-shadow: none;
+}
+html[data-desktop="electron"] .drawer-toggle,
+html[data-desktop="electron"] .drawer-backdrop {
+  display: none !important;
+}
+html[data-desktop="electron"] #left-resize,
+html[data-desktop="electron"] #right-resize {
+  display: block;
+}
+
+/* Keep Properties anchored to the visible right edge of the Electron shell.
+   This also covers older Chromium builds that calculate flex widths from a
+   scaled viewport and otherwise leave an empty black strip beside the CAD view. */
+html[data-desktop="electron"] #right-dock {
+  position: absolute !important;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  width: 320px !important;
+  min-width: 320px !important;
+  max-width: 320px !important;
+  background: var(--bg-surface) !important;
+  transform: none !important;
+}
+html[data-desktop="electron"] #central {
+  margin-right: 320px;
+}
+html[data-desktop="electron"] #right-resize {
+  display: none;
+}
+
 /* ── Mobile: ≤768px ──────────────────────────────────────── */
 @media (max-width: 768px) {
   /* Toolbar: keep only critical buttons, hide labels */

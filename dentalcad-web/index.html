@@ -736,7 +736,7 @@
                 </div>
 
                 <div class="param-label" style="margin-top:16px">Material</div>
-                <select class="form-select" style="width:100%;height:28px;font-size:12px">
+                <select id="design-material" class="form-select" style="width:100%;height:28px;font-size:12px" aria-label="Design material">
                   <option>Zirconia (3Y-TZP)</option>
                   <option>Zirconia (5Y-TZP)</option>
                   <option>Lithium Disilicate</option>
@@ -958,7 +958,7 @@
                 </div>
 
                 <div class="param-label">Shade</div>
-                <select class="form-select" style="width:100%;height:28px;font-size:12px">
+                <select id="design-shade" class="form-select" style="width:100%;height:28px;font-size:12px" aria-label="Design shade">
                   <option>A1</option><option selected>A2</option><option>A3</option>
                   <option>A3.5</option><option>B1</option><option>B2</option>
                 </select>
@@ -1371,7 +1371,7 @@
       <div id="props-panel">
         <div class="prop-group">
           <div class="section-hdr" style="margin-bottom:8px">Material</div>
-          <select class="form-select" style="width:100%;margin-bottom:8px">
+          <select id="prop-material" class="form-select" style="width:100%;margin-bottom:8px" aria-label="Restoration material">
             <option>Zirconia (3Y-TZP)</option>
             <option>Zirconia (5Y-TZP)</option>
             <option>Lithium Disilicate</option>
@@ -1383,26 +1383,26 @@
           </select>
           <div class="prop-grid">
             <span class="prop-label">Thickness</span>
-            <span class="prop-val">1.2 mm</span>
+            <span id="prop-thickness" class="prop-val">1.2 mm</span>
             <span class="prop-label">Occlusal</span>
-            <span class="prop-val">1.5 mm</span>
+            <span id="prop-occlusal" class="prop-val">1.5 mm</span>
             <span class="prop-label">Spacing</span>
-            <span class="prop-val">0.05 mm</span>
+            <span id="prop-spacing" class="prop-val">0.05 mm</span>
           </div>
         </div>
         <div class="prop-group">
           <div class="section-hdr" style="margin-bottom:8px">Shade</div>
-          <select class="form-select" style="width:100%;margin-bottom:8px">
+          <select id="prop-shade" class="form-select" style="width:100%;margin-bottom:8px" aria-label="Restoration shade">
             <option>A1</option><option selected>A2</option><option>A3</option>
             <option>A3.5</option><option>B1</option><option>B2</option>
             <option>C1</option><option>C2</option><option>D2</option>
           </select>
           <div class="prop-label" style="margin-bottom:4px">Surface Texture</div>
-          <input type="range" class="range-slider" min="0" max="100" value="50" />
+          <input id="prop-texture" type="range" class="range-slider" min="0" max="100" value="50" aria-label="Surface texture" />
         </div>
         <div class="prop-group">
           <div class="section-hdr" style="margin-bottom:8px">Stump Shade</div>
-          <select class="form-select" style="width:100%">
+          <select id="prop-stump-shade" class="form-select" style="width:100%" aria-label="Stump shade">
             <option>ST1</option><option>ST2</option><option>ST3</option>
             <option>ST4</option><option>ST5</option><option>None</option>
           </select>

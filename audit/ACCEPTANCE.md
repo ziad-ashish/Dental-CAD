@@ -12,7 +12,7 @@ Run all local gates (build, tests, diff check, and HTTP smoke) with:
 powershell -NoProfile -ExecutionPolicy Bypass -File .\audit\run-all.ps1
 ```
 
-The suite currently verifies 102 cases across:
+The suite currently verifies 103 cases across:
 
 - STL, OBJ, and ASCII PLY import; malformed input rejection; STL/OBJ/PLY/3MF package export
 - project persistence, autosave recovery, version checks, and margin validation

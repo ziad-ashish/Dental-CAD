@@ -610,7 +610,77 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // ── RIGHT DOCK — tooth library thumbs ──────────────────
-  // Note: lib-thumb click handlers wired in §4.3 below
+  // Property controls are part of the live case state, not decorative markup.
+  const _shadeColors = {
+    A1: 0xf4ead2, A2: 0xead8b6, A3: 0xd6b88f, 'A3.5': 0xc79770,
+    B1: 0xf7f1dc, B2: 0xe8cfaa, C1: 0xd8c39f, C2: 0xc8aa7e, D2: 0xd4b693,
+  };
+  const _propertyDefaults = { material: 'Zirconia (3Y-TZP)', shade: 'A2', stumpShade: 'ST1', texture: 50, thickness: 1.2, occlusal: 1.5, spacing: 0.05 };
+
+  function _applyShadeToViewport(shade) {
+    const hex = _shadeColors[shade];
+    if (hex != null) Viewport.setColor(hex);
+  }
+
+  function _syncPropertyPanel(data = {}) {
+    const d = { ..._propertyDefaults, ...data };
+    const setValue = (id, value) => { const el = document.getElementById(id); if (el && value != null) el.value = value; };
+    const setText = (id, value) => { const el = document.getElementById(id); if (el) el.textContent = value; };
+    setValue('prop-material', d.material);
+    setValue('prop-shade', d.shade);
+    setValue('prop-stump-shade', d.stumpShade);
+    setValue('prop-texture', Number(d.texture));
+    setValue('design-material', d.material);
+    setValue('design-shade', d.shade);
+    setText('prop-thickness', `${Number(d.thickness).toFixed(2)} mm`);
+    setText('prop-occlusal', `${Number(d.occlusal).toFixed(2)} mm`);
+    setText('prop-spacing', `${Number(d.spacing).toFixed(2)} mm`);
+    _applyShadeToViewport(d.shade);
+  }
+
+  function _bindPropertyPanel() {
+    const data = Wizard.getData();
+    const material = document.getElementById('prop-material');
+    const designMaterial = document.getElementById('design-material');
+    const shade = document.getElementById('prop-shade');
+    const designShade = document.getElementById('design-shade');
+    const texture = document.getElementById('prop-texture');
+    const stumpShade = document.getElementById('prop-stump-shade');
+    const mark = (message) => { ProjectIO.markDirty(); _scheduleAutoSave(); setMsg(message, 1800); };
+
+    const setMaterial = (value) => {
+      data.material = value;
+      if (material) material.value = value;
+      if (designMaterial) designMaterial.value = value;
+      mark(`Material: ${value}`);
+    };
+    const setShade = (value) => {
+      data.shade = value;
+      if (shade) shade.value = value;
+      if (designShade) designShade.value = value;
+      _applyShadeToViewport(value);
+      mark(`Shade: ${value}`);
+    };
+    material?.addEventListener('change', e => setMaterial(e.target.value));
+    designMaterial?.addEventListener('change', e => setMaterial(e.target.value));
+    shade?.addEventListener('change', e => setShade(e.target.value));
+    designShade?.addEventListener('change', e => setShade(e.target.value));
+    texture?.addEventListener('input', e => {
+      data.texture = Number(e.target.value);
+      const mat = Viewport.getMeshMaterial?.();
+      if (mat) {
+        mat.shininess = Math.max(8, 120 - data.texture * 1.05);
+        if ('roughness' in mat) mat.roughness = data.texture / 100;
+        mat.needsUpdate = true;
+        Viewport.render?.();
+      }
+      mark(`Surface texture: ${data.texture}%`);
+    });
+    stumpShade?.addEventListener('change', e => { data.stumpShade = e.target.value; mark(`Stump shade: ${data.stumpShade}`); });
+    _syncPropertyPanel(data);
+  }
+
+  _bindPropertyPanel();
 
   // ═══════════════════════════════════════════════════════════
   // DIRTY / UNSAVED-CHANGES TRACKING
@@ -1218,6 +1288,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       });
     }
+    _syncPropertyPanel(data);
   }
 
   // ── Helper: populate scan info panel from stats ────────────
@@ -2252,6 +2323,11 @@ document.addEventListener('DOMContentLoaded', () => {
       document.getElementById('lib-detail-mfr').textContent   = this.dataset.mfr   || '—';
       document.getElementById('lib-detail-type').textContent  = this.dataset.type  || '—';
       document.getElementById('lib-detail-shade').textContent = this.dataset.shade || '—';
+      const caseData = Wizard.getData();
+      if (this.dataset.shade) {
+        caseData.shade = this.dataset.shade;
+        _syncPropertyPanel(caseData);
+      }
       // Single-click already loads the 3D shape so the user sees it immediately
       _loadLibraryShape(this);
     });
@@ -2680,6 +2756,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const leftDock  = document.getElementById('left-dock');
     const rightDock = document.getElementById('right-dock');
     const mainBody  = document.getElementById('main-body');
+    let responsiveInitialized = false;
 
     // Create backdrop overlay
     const backdrop = document.createElement('div');
@@ -2693,7 +2770,7 @@ document.addEventListener('DOMContentLoaded', () => {
       btn.className  = `drawer-toggle ${side === 'right' ? 'right' : ''}`;
       btn.id         = `drawer-toggle-${side}`;
       btn.setAttribute('aria-label', `${side === 'left' ? 'Open Case Tree' : 'Open Properties'}`);
-      btn.innerHTML  = side === 'left' ? '›' : '‹';
+      btn.innerHTML  = side === 'left' ? '☰' : '⚙';
       btn.style.display = 'none';   // hidden until ≤1024px
       document.getElementById('app')?.appendChild(btn);
       return btn;
@@ -2710,7 +2787,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function _closeDrawer(dock, toggle, isLeft) {
       dock.classList.remove('drawer-open');
       if (!document.querySelector('.dock.drawer-open')) backdrop.classList.remove('visible');
-      toggle.innerHTML = isLeft ? '›' : '‹';
+      toggle.innerHTML = isLeft ? '☰' : '⚙';
       toggle.setAttribute('aria-label', isLeft ? 'Open Case Tree' : 'Open Properties');
     }
 
@@ -2742,7 +2819,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (origToggleRight) origToggleRight.addEventListener('click', () => rightToggle.click());
 
     function _checkResponsive() {
-      const isTablet = window.innerWidth <= 1024;
+      // Electron's BrowserWindow has a desktop minimum width. On Windows
+      // with display scaling, innerWidth can still fall below the tablet
+      // breakpoint, so use the shell identity rather than hiding the docks.
+      const isElectronShell = Boolean(window.dentalcadDesktop?.isElectron ||
+        document.documentElement.dataset.desktop === 'electron');
+      const isTablet = !isElectronShell && window.innerWidth <= 1024;
       // Show/hide toggle buttons
       leftToggle.style.display  = isTablet ? 'flex' : 'none';
       rightToggle.style.display = isTablet ? 'flex' : 'none';
@@ -2753,10 +2835,16 @@ document.addEventListener('DOMContentLoaded', () => {
         rightDock?.classList.remove('drawer-open', 'hidden');
         backdrop.classList.remove('visible');
       } else {
-        // Tablet/mobile: close drawers on resize
-        if (leftDock?.classList.contains('drawer-open'))  _closeDrawer(leftDock,  leftToggle,  true);
-        if (rightDock?.classList.contains('drawer-open')) _closeDrawer(rightDock, rightToggle, false);
+        // Tablet/mobile: expose Properties on first load so the controls do not
+        // appear to be missing; subsequent resizes close drawers cleanly.
+        if (!responsiveInitialized) {
+          _openDrawer(rightDock, rightToggle, false);
+        } else {
+          if (leftDock?.classList.contains('drawer-open'))  _closeDrawer(leftDock,  leftToggle,  true);
+          if (rightDock?.classList.contains('drawer-open')) _closeDrawer(rightDock, rightToggle, false);
+        }
       }
+      responsiveInitialized = true;
 
       // Mobile ≤600px: show read-only notice in viewport if not already present
       const noticeId = 'mobile-readonly-notice';

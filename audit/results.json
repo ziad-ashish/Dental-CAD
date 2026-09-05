@@ -8,6 +8,10 @@
     "status": "PASS"
   },
   {
+    "name": "Right properties panel is wired to case data and viewport material",
+    "status": "PASS"
+  },
+  {
     "name": "Scan import runs mesh repair and preserves its report",
     "status": "PASS"
   },
